@@ -350,10 +350,10 @@ class Method(Function):
 
         return df
 
-    def check(self):
+    """def check(self):
         for s in self.content:
             if isinstance(s, MultiLineComment):
                 self.basic_comments = True
                 self.ml_comment = True
             else:
-                s.check()
+                s.check()"""

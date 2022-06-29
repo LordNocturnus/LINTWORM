@@ -43,4 +43,4 @@ func_checks = [re.compile(r"[ ]*def [a-zA-Z0-9_]+\(")]
 class_checks = [re.compile(r"[ ]*class [a-zA-Z0-9_]+(\([a-zA-Z0-9_\.]*\))?:")]
 line_checks = [re.compile(r"[ ]*[a-zA-Z0-9_]+")]
 
-format_checks = [re.compile(r'[\t ]*"""\n([\t ]*[\w., ]+\n)+[\t ]*\n([\t ]*:param \w+: {[\w.]+}([\t ]+[\w., ]+\n)+)*[\t ]*\n([\t ]*:return: {[\w.]+}\n)*[\t ]*\n([\t ]*:raise \w+:\n)*[\t ]*"""\n')]
+format_checks = [re.compile(r'[\t ]*"""\n([\t ]*[\w., ]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[\w., ]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}\n)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n')]

@@ -165,4 +165,4 @@ def analyse_file(path, report=None):
 
 if __name__ == "__main__":
     #window_start(path="G:/pythonprojects/NEST/LINTWORM", graph="percent", report=True)
-    simple_start(path="G:/pythonprojects/NEST/LINTWORM", report="G:/pythonprojects/NEST/LINTWORM")
+    simple_start(path="G:/pythonprojects/NEST/WIZARD", report="G:/pythonprojects/NEST/LINTWORM")
