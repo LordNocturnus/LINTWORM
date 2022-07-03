@@ -43,8 +43,26 @@ func_checks = [re.compile(r"[ ]*def [a-zA-Z0-9_]+\(")]
 class_checks = [re.compile(r"[ ]*class [a-zA-Z0-9_]+(\([a-zA-Z0-9_\.]*\))?:")]
 line_checks = [re.compile(r"[ ]*[a-zA-Z0-9_]+")]
 
-standard_classregex = {"main": None}
+standard_classregex = {"main": None,
+                       "parameter_start": r"[\s]*:param ",
+                       "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
+                       "return_start": None,
+                       "return_end": None,
+                       "raise_start": None,
+                       "raise_end": None}
 
-standard_functionregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n')}
+standard_functionregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n'),
+                          "parameter_start": r"[\s]*:param ",
+                          "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
+                          "return_start": None,
+                          "return_end": None,
+                          "raise_start": None,
+                          "raise_end": None}
 
-standard_methodregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n')}
+standard_methodregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n'),
+                        "parameter_start": r"[\s]*:param ",
+                        "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
+                        "return_start": None,
+                        "return_end": None,
+                        "raise_start": None,
+                        "raise_end": None}

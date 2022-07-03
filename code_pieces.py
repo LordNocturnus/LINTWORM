@@ -8,7 +8,7 @@ class MultiLineComment(object):
         This class is used to save and progress any multiline comments found in the python code that is parsed.
     """
 
-    def __init__(self, line, delimiter, regex=None):
+    def __init__(self, line, delimiter, regex=None, parent_type=None):
         """
 
         :param line:
@@ -18,6 +18,7 @@ class MultiLineComment(object):
         self.delimiter = delimiter
         self.lines = [line]
         self.regex = regex
+        self.parent_type = parent_type
 
     def parse(self, i, lines):
         while i < len(lines) and self.delimiter*3 not in lines[i][1]:
@@ -32,33 +33,8 @@ class MultiLineComment(object):
     def report(self, df):
         return df
 
-    def check_function(self, inputs, returns, raises):
-        text = []
-        param_flag = False
-        param_list = []
-        return_flag = False
-        return_list = []
-        raise_flag = False
-        raise_list = []
-
-        for line in self.lines[1:-1]:
-            if raise_flag:
-                raise_list.append(line[1])
-            elif return_flag:
-                if ":raise" in line[1]:
-                    raise_flag = True
-                else:
-                    return_list.append(line[1])
-            elif param_flag:
-                if ":return" in line[1]:
-                    return_flag = True
-                else:
-                    param_list.append(line[1])
-            else:
-                if ":param" in line[1]:
-                    param_flag = True
-                else:
-                    text.append(line[1])
+    def check_function(self, parameters, returns, raises):
+        print()
         print("debug")
 
     @property
@@ -68,8 +44,7 @@ class MultiLineComment(object):
 
 class Code(object):
 
-    def __init__(self, name, indent, path, line=None, classregex=parser.standard_classregex,
-                 functionregex=parser.standard_functionregex, methodregex=parser.standard_methodregex):
+    def __init__(self, name, indent, path, classregex, functionregex, methodregex, line=None):
         self.path = path
         self.name = name
         self.indent = indent
@@ -99,13 +74,13 @@ class Code(object):
                     delimiter = "'"
 
                 if defstr == "class":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.classregex))
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.classregex, defstr))
                 elif defstr == "function":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.functionregex))
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.functionregex, defstr))
                 elif defstr == "method":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.methodregex))
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.methodregex, defstr))
                 else:
-                    self.content.append(MultiLineComment(lines[i], delimiter))
+                    self.content.append(MultiLineComment(lines[i], delimiter, parent_type=defstr))
 
                 if len(parser.comment_checks[4].findall(lines[i][1])) > 1:
                     i += 1
@@ -116,21 +91,19 @@ class Code(object):
                 break
             elif parser.class_checks[0].match(lines[i][1]):
                 self.content.append(Class(lines[i][1].split(":")[0].split("class ")[1].split("(")[0], lines[i][0],
-                                          self.path, lines[i][1], classregex=self.classregex,
-                                          functionregex=self.functionregex, methodregex=self.methodregex))
+                                          self.path, self.classregex, self.functionregex, self.methodregex,
+                                          lines[i][1]))
                 i += 1
                 i = self.content[-1].parse(i, lines, "class")
             elif parser.func_checks[0].match(lines[i][1]):
                 if defstr == "class":
                     self.content.append(Method(lines[i][1].split("def ")[1].split("(")[0], lines[i][0], self.path,
-                                               lines[i][1], classregex=self.classregex,
-                                               functionregex=self.functionregex, methodregex=self.methodregex))
+                                               self.classregex, self.functionregex, self.methodregex, lines[i][1]))
                     i += 1
                     i = self.content[-1].parse(i, lines, "method")
                 else:
                     self.content.append(Function(lines[i][1].split("def ")[1].split("(")[0], lines[i][0], self.path,
-                                                 lines[i][1], classregex=self.classregex,
-                                                 functionregex=self.functionregex,  methodregex=self.methodregex))
+                                                 self.classregex, self.functionregex, self.methodregex, lines[i][1]))
                     i += 1
                     i = self.content[-1].parse(i, lines, "function")
 
@@ -176,45 +149,15 @@ class Code(object):
                         str_flag = False
                 break
 
+    @property
+    def text(self):
+        return "".join(self.lines)
+
 
 class Class(Code):
 
-    def __init__(self, name, indent, path, line, classregex, functionregex, methodregex):
-        super().__init__(name, indent, path, line, classregex, functionregex, methodregex)
-
-        '''def parse(self, i, lines, defstr=None):
-        self.start = max(1, i)
-        while i < len(lines):
-            if parser.comment_check(lines[i][1]):
-                if '"""' in lines[i][1]:
-                    self.content.append(MultiLineComment(lines[i][1], '"'))
-                else:
-                    self.content.append(MultiLineComment(lines[i][1], "'"))
-                if len(parser.comment_checks[4].findall(lines[i][1])) > 1:
-                    i += 1
-                else:
-                    i += 1
-                    i = self.content[-1].parse(i, lines)
-            elif lines[i][0] <= self.indent and parser.line_checks[0].match(lines[i][1]):
-                break
-            elif parser.class_checks[0].match(lines[i][1]):
-                self.content.append(
-                    Class(lines[i][1].split(":")[0].split("class ")[1].split("(")[0], lines[i][0], self.path,
-                          lines[i][1], classregex=self.classregex, functionregex=self.functionregex,
-                          methodregex=self.methodregex))
-                i += 1
-                i = self.content[-1].parse(i, lines)
-            elif parser.func_checks[0].match(lines[i][1]):
-                self.content.append(Method(lines[i][1].split("def ")[1].split("(")[0], lines[i][0], self.path,
-                                           lines[i][1], classregex=self.classregex, functionregex=self.functionregex,
-                                           methodregex=self.methodregex))
-                i += 1
-                i = self.content[-1].parse(i, lines)
-            else:
-                self.lines.append(lines[i][1])
-                i += 1
-        self.end = i
-        return i#'''
+    def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
+        super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
 
     def report(self, df):
         datapoint = pd.DataFrame([[self.path, self.name, "class", self.start + 1, self.end + 1, None, None, None,
@@ -240,8 +183,8 @@ class Class(Code):
 
 class Function(Code):
 
-    def __init__(self, name, indent, path, line, classregex, functionregex, methodregex):
-        super().__init__(name, indent, path, line, classregex, functionregex, methodregex)
+    def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
+        super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
         self.inputs = []
         self.returns = []
         self.raises = []
@@ -249,7 +192,7 @@ class Function(Code):
     def parse(self, i, lines, defstr=None):
         i = super().parse(i, lines, defstr)
         self.check_inputs()
-        """for line in range(len(self.lines)):
+        for line in range(len(self.lines)):
             if " return " in self.lines[line]:
                 return_line = self.lines[line].split(" return ")
                 in_str = False
@@ -275,13 +218,13 @@ class Function(Code):
                     elif return_line[0][c] == "'" and not return_line[0][c - 1] == "\\":
                         in_str = "'"
                 if not in_str:
-                    self.raises.append(str(line))"""
+                    self.raises.append(str(line))
         return i
 
     def report(self, df):
         datapoint = pd.DataFrame([[self.path, self.name, "function", self.start + 1, self.end + 1,
-                                   ":".join(self.inputs), ":".join(self.returns), ":".join(self.raises),
-                                   self.basic_comments, self.ml_comment, self.ml_formatted, self.ml_complete]],
+                                   ":".join(self.inputs), len(self.returns), len(self.raises), self.basic_comments,
+                                   self.ml_comment, self.ml_formatted, self.ml_complete]],
                                  columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
                                           "raises", "basic comments", "multiline comments", "formatted multiline",
                                           "Documented"])
@@ -359,13 +302,13 @@ class Function(Code):
 
 class Method(Function):
 
-    def __init__(self, name, indent, path, line, classregex, functionregex, methodregex):
-        super().__init__(name, indent, path, line, classregex, functionregex, methodregex)
+    def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
+        super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
 
     def report(self, df):
         datapoint = pd.DataFrame([[self.path, self.name, "method", self.start + 1, self.end + 1, ":".join(self.inputs),
-                                   ":".join(self.returns), ":".join(self.raises),  self.basic_comments,
-                                   self.ml_comment, self.ml_formatted, self.ml_complete]],
+                                   len(self.returns), len(self.raises),  self.basic_comments, self.ml_comment,
+                                   self.ml_formatted, self.ml_complete]],
                                  columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
                                           "raises", "basic comments", "multiline comments", "formatted multiline",
                                           "Documented"])
@@ -375,11 +318,3 @@ class Method(Function):
             df = sub.report(df)
 
         return df
-
-    """def check(self):
-        for s in self.content:
-            if isinstance(s, MultiLineComment):
-                self.basic_comments = True
-                self.ml_comment = True
-            else:
-                s.check()"""
