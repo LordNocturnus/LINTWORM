@@ -34,6 +34,49 @@ def comment_check(line):
     return False
 
 
+def get_regex_instances(text, regex):
+    """
+        a function to get a list of all matches of the given regex in text
+
+    :param text:    {str}           text to be checked for occurrences of the regex pattern
+    :param regex:   {re.Pattern}    regex pattern to search for in text
+
+    :return:        {list}          list of all occurrences of the regex pattern in text
+    """
+    ret = []
+
+    while True:
+        new_match = regex.search(text)
+        if not new_match:
+            break
+        ret.append(new_match.group(0))
+        text = regex.sub("", text, 1)
+    return ret
+
+
+def check_in_str(line):
+    in_str = False
+    for c in range(len(line[0])):
+        if in_str:
+            if line[0][c] == in_str and not line[0][c - 1] == "\\":
+                in_str = False
+        elif line[0][c] == '"' and not line[0][c - 1] == "\\":
+            in_str = '"'
+        elif line[0][c] == "'" and not line[0][c - 1] == "\\":
+            in_str = "'"
+        elif line[0][c] == "#":
+            in_str = True
+            break
+
+    if not in_str:
+        return False
+    return True
+
+
+def get_parameters(line):
+    pass
+
+
 comment_checks = [re.compile("[^#]*\"{3}|\'{3}"),
                   re.compile("[^\"]*\"[^\"]*\'{3}"),
                   re.compile("[^\']*\'[^\']*\"{3}"),
@@ -51,18 +94,19 @@ standard_classregex = {"main": None,
                        "raise_start": None,
                        "raise_end": None}
 
-standard_functionregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n'),
+standard_functionregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
                           "parameter_start": r"[\s]*:param ",
                           "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                          "return_start": None,
-                          "return_end": None,
-                          "raise_start": None,
-                          "raise_end": None}
+                          "return_start": r"[\s]*:return:",
+                          "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
+                          "raise_start": r"[\s]*:raise:[\s]+",
+                          "raise_end": r"[\s]*\n"}
 
-standard_methodregex = {"main": re.compile(r'[\t ]*"""\n([\t ]*[^:]+\n)+([\t ]*\n([\t ]*:param \w+:[\t ]+{[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:return: {[\w.]+}([\t ]+[^:]+\n)+)+)?([\t ]*\n([\t ]*:raise [\w.]+:\n)+)?[\t ]*"""\n'),
+standard_methodregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
                         "parameter_start": r"[\s]*:param ",
                         "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                        "return_start": None,
-                        "return_end": None,
-                        "raise_start": None,
-                        "raise_end": None}
+                        "return_start": r"[\s]*:return:",
+                        "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
+                        "raise_start": r"[\s]*:raise:[\s]+",
+                          "raise_end": r"[\s]*\n"}
+

@@ -30,12 +30,50 @@ class MultiLineComment(object):
         i += 1
         return i
 
-    def report(self, df):
+    def report(self, df, columns):
         return df
 
     def check_function(self, parameters, returns, raises):
-        print()
-        print("debug")
+        found_parameters = []
+        count_parameters = 0
+        found_returns = []
+        count_returns = 0
+        found_raises = []
+        count_raises = 0
+
+        documented = True
+
+        parameter_lines = parser.get_regex_instances(self.text, self.regex["parameter_line"])
+        for param in parameter_lines:
+            param = self.regex["parameter_start"].sub("", param)
+            found_parameters.append(self.regex["parameter_end"].sub("", param))
+            count_parameters += 1
+            if param in parameters:
+                parameters.pop(parameters.index(param))
+
+        documented = documented and len(parameters) == 0
+
+        return_lines = parser.get_regex_instances(self.text, self.regex["return_line"])
+        for ret in return_lines:
+            ret = self.regex["return_start"].sub("", ret)
+            found_returns.append(self.regex["return_end"].sub("", ret))
+            count_returns += 1
+            if ret in returns:
+                returns.pop(returns.index(ret))
+
+        documented = documented and count_returns == len(returns)
+
+        raise_lines = parser.get_regex_instances(self.text, self.regex["raise_line"])
+        for r in raise_lines:
+            r = self.regex["raise_start"].sub("", r)
+            found_raises.append(self.regex["raise_end"].sub("", r))
+            count_raises += 1
+            if r in raises:
+                raises.pop(raises.index(r))
+
+        documented = documented and len(raises) == 0
+
+        return found_parameters, count_returns, found_raises, documented
 
     @property
     def text(self):
@@ -64,7 +102,19 @@ class Code(object):
         self.start = None
         self.end = None
 
-    def parse(self, i, lines, defstr=None):
+        self.inputs = []
+        self.returns = []
+        self.raises = []
+        self.parameters = []
+
+        self.found_inputs = []
+        self.found_returns = 0
+        self.found_raises = []
+        self.found_parameters = []
+
+        self.defstr = "file"
+
+    def parse(self, i, lines):
         self.start = max(1, i)
         while i < len(lines):
             if parser.comment_check(lines[i][1]):
@@ -73,14 +123,14 @@ class Code(object):
                 else:
                     delimiter = "'"
 
-                if defstr == "class":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.classregex, defstr))
-                elif defstr == "function":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.functionregex, defstr))
-                elif defstr == "method":
-                    self.content.append(MultiLineComment(lines[i], delimiter, self.methodregex, defstr))
+                if self.defstr == "class":
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.classregex, self.defstr))
+                elif self.defstr == "function":
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.functionregex, self.defstr))
+                elif self.defstr == "method":
+                    self.content.append(MultiLineComment(lines[i], delimiter, self.methodregex, self.defstr))
                 else:
-                    self.content.append(MultiLineComment(lines[i], delimiter, parent_type=defstr))
+                    self.content.append(MultiLineComment(lines[i], delimiter, parent_type=self.defstr))
 
                 if len(parser.comment_checks[4].findall(lines[i][1])) > 1:
                     i += 1
@@ -94,35 +144,113 @@ class Code(object):
                                           self.path, self.classregex, self.functionregex, self.methodregex,
                                           lines[i][1]))
                 i += 1
-                i = self.content[-1].parse(i, lines, "class")
+                i = self.content[-1].parse(i, lines)
             elif parser.func_checks[0].match(lines[i][1]):
-                if defstr == "class":
+                if self.defstr == "class":
                     self.content.append(Method(lines[i][1].split("def ")[1].split("(")[0], lines[i][0], self.path,
                                                self.classregex, self.functionregex, self.methodregex, lines[i][1]))
                     i += 1
-                    i = self.content[-1].parse(i, lines, "method")
+                    i = self.content[-1].parse(i, lines)
                 else:
                     self.content.append(Function(lines[i][1].split("def ")[1].split("(")[0], lines[i][0], self.path,
                                                  self.classregex, self.functionregex, self.methodregex, lines[i][1]))
                     i += 1
-                    i = self.content[-1].parse(i, lines, "function")
+                    i = self.content[-1].parse(i, lines)
 
             else:
                 self.lines.append(lines[i][1])
                 i += 1
+
+                if " return " in self.lines[-1]:
+                    return_line = self.lines[-1].split(" return ")
+                    if not parser.check_in_str(return_line):
+                        self.returns.append(str(len(self.lines)))
+
+                if " raise " in self.lines[-1]:
+                    raise_line = self.lines[-1].split(" raise ")
+                    if not parser.check_in_str(raise_line):
+                        self.raises.append(self.lines[-1].split(" raise ")[1].split("(")[0])
+
+                if "self." in self.lines[-1]:
+                    param_line = self.lines[-1].split("self.")
+                    print(param_line)
         self.end = i
         return i
 
-    def report(self, df):
-        datapoint = pd.DataFrame([[self.path, self.name, "file", self.start + 1, self.end + 1, None, None, None,
-                                   self.basic_comments, self.ml_comment, self.ml_formatted, self.ml_complete]],
-                                 columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
-                                          "raises", "basic comments", "multiline comments", "formatted multiline",
-                                          "Documented"])
+    def report(self, df, columns):
+        data = []
+        col = []
+        if "path" in columns:
+            data.append(self.path)
+            col.append("path")
+        if "name" in columns:
+            data.append(self.name)
+            col.append("name")
+        if "type" in columns:
+            data.append(self.defstr)
+            col.append("type")
+
+        if "start line" in columns:
+            data.append(self.start + 1)
+            col.append("start line")
+        if "end line" in columns:
+            data.append(self.end + 1)
+            col.append("end line")
+
+        if "inputs" in columns:
+            data.append(":".join(self.inputs))
+            col.append("inputs")
+        if "found inputs" in columns:
+            data.append(":".join(self.found_inputs))
+            col.append("found inputs")
+        if "missing inputs" in columns:
+            data.append(":".join([i for i in self.inputs if i not in self.found_inputs]))
+            col.append("missing inputs")
+
+        if "returns" in columns:
+            data.append(len(self.returns))
+            col.append("returns")
+        if "found returns" in columns:
+            data.append(self.found_returns)
+            col.append("found returns")
+
+        if "raises" in columns:
+            data.append(":".join(self.raises))
+            col.append("raises")
+        if "found raises" in columns:
+            data.append(":".join(self.found_raises))
+            col.append("found raises")
+        if "missing raises" in columns:
+            data.append(":".join([i for i in self.raises if i not in self.found_raises]))
+            col.append("missing raises")
+
+        if "parameters" in columns:
+            data.append(":".join(self.parameters))
+            col.append("parameters")
+        if "found parameters" in columns:
+            data.append(":".join(self.found_parameters))
+            col.append("found parameters")
+        if "missing parameters" in columns:
+            data.append(":".join([i for i in self.parameters if i not in self.found_parameters]))
+            col.append("missing parameters")
+
+        if "basic comments" in columns:
+            data.append(self.basic_comments)
+            col.append("basic comments")
+        if "multiline comments" in columns:
+            data.append(self.ml_comment)
+            col.append("multiline comments")
+        if "formatted multiline" in columns:
+            data.append(self.ml_formatted)
+            col.append("formatted multiline")
+        if "Documented" in columns:
+            data.append(self.ml_complete)
+            col.append("Documented")
+        datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
 
         for sub in self.content:
-            df = sub.report(df)
+            df = sub.report(df, columns)
 
         return df
 
@@ -158,19 +286,7 @@ class Class(Code):
 
     def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
         super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
-
-    def report(self, df):
-        datapoint = pd.DataFrame([[self.path, self.name, "class", self.start + 1, self.end + 1, None, None, None,
-                                   self.basic_comments, self.ml_comment, self.ml_formatted, self.ml_complete]],
-                                 columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
-                                          "raises", "basic comments", "multiline comments", "formatted multiline",
-                                          "Documented"])
-        df = pd.concat([df, datapoint], ignore_index=True)
-
-        for sub in self.content:
-            df = sub.report(df)
-
-        return df
+        self.defstr = "class"
 
     def check(self):
         for s in self.content:
@@ -185,64 +301,23 @@ class Function(Code):
 
     def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
         super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
-        self.inputs = []
-        self.returns = []
-        self.raises = []
 
-    def parse(self, i, lines, defstr=None):
-        i = super().parse(i, lines, defstr)
+        self.defstr = "function"
+
+    def parse(self, i, lines):
+        i = super().parse(i, lines)
         self.check_inputs()
-        for line in range(len(self.lines)):
-            if " return " in self.lines[line]:
-                return_line = self.lines[line].split(" return ")
-                in_str = False
-                for c in range(len(return_line[0])):
-                    if in_str:
-                        if return_line[0][c] == in_str and not return_line[0][c - 1] == "\\":
-                            in_str = False
-                    elif return_line[0][c] == '"' and not return_line[0][c - 1] == "\\":
-                        in_str = '"'
-                    elif return_line[0][c] == "'" and not return_line[0][c - 1] == "\\":
-                        in_str = "'"
-                if not in_str:
-                    self.returns.append(str(line))
-            if " raise " in self.lines[line]:
-                return_line = self.lines[line].split(" raise ")
-                in_str = False
-                for c in range(len(return_line[0])):
-                    if in_str:
-                        if return_line[0][c] == in_str and not return_line[0][c - 1] == "\\":
-                            in_str = False
-                    elif return_line[0][c] == '"' and not return_line[0][c - 1] == "\\":
-                        in_str = '"'
-                    elif return_line[0][c] == "'" and not return_line[0][c - 1] == "\\":
-                        in_str = "'"
-                if not in_str:
-                    self.raises.append(str(line))
         return i
-
-    def report(self, df):
-        datapoint = pd.DataFrame([[self.path, self.name, "function", self.start + 1, self.end + 1,
-                                   ":".join(self.inputs), len(self.returns), len(self.raises), self.basic_comments,
-                                   self.ml_comment, self.ml_formatted, self.ml_complete]],
-                                 columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
-                                          "raises", "basic comments", "multiline comments", "formatted multiline",
-                                          "Documented"])
-        df = pd.concat([df, datapoint], ignore_index=True)
-
-        for sub in self.content:
-            df = sub.report(df)
-
-        return df
 
     def check(self):
         for s in self.content:
             if isinstance(s, MultiLineComment):
                 self.basic_comments = True
                 self.ml_comment = True
-                if self.functionregex["main"].fullmatch(s.text):
+                if self.functionregex["main"].match(s.text):
                     self.ml_formatted = True
-                    s.check_function(self.inputs, self.returns, self.raises)
+                    self.found_inputs, self.found_returns, self.found_raises, self.ml_complete = s.check_function(
+                        self.inputs, self.returns, self.raises)
             else:
                 s.check()
 
@@ -305,16 +380,9 @@ class Method(Function):
     def __init__(self, name, indent, path, classregex, functionregex, methodregex, line):
         super().__init__(name, indent, path, classregex, functionregex, methodregex, line)
 
-    def report(self, df):
-        datapoint = pd.DataFrame([[self.path, self.name, "method", self.start + 1, self.end + 1, ":".join(self.inputs),
-                                   len(self.returns), len(self.raises),  self.basic_comments, self.ml_comment,
-                                   self.ml_formatted, self.ml_complete]],
-                                 columns=["path", "name", "type", "start_line", "end line", "inputs", "returns",
-                                          "raises", "basic comments", "multiline comments", "formatted multiline",
-                                          "Documented"])
-        df = pd.concat([df, datapoint], ignore_index=True)
+        self.defstr = "method"
 
-        for sub in self.content:
-            df = sub.report(df)
-
-        return df
+    def check_inputs(self):
+        super().check_inputs()
+        if "self" in self.inputs:
+            self.inputs.pop(self.inputs.index("self"))
