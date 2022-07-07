@@ -1,112 +1,195 @@
 import re
 
-
-def replace_tabs(string):
-    """
-        This function replaces all tabs in a string with the number of spaces that result in a string with the same
-        indentation and length
-
-        :param
-            string {str}    -- string potentially containing tabs to be replaced with spaces
-        :return
-            {str}           -- string with all tabs replaced by spaces
-    """
-    new_str = string.split("\t")
-    for i in range(0, len(new_str) - 1):
-        new_str[i] += " " * (4 - len(new_str[i]) % 4)
-    new_str = "".join(new_str)
-    return new_str
+import code_pieces
 
 
-def comment_check(line):
-    """
-    Checks if the line is the start of a Multiline comment
+class Parser(object):
 
-    :param
-        line {str}  -- line to be checked for Multiline comment start
-    :return
-        {bool}      -- True if line contains the start of a Multiline comment
-    """
-    if '"""' in line or "'''" in line:
-        if comment_checks[0].match(line):
-            if not comment_checks[1].match(line) and not comment_checks[2].match(line):
-                return True
-    return False
+    def __init__(self, text, parent=None):
+        self.text = text
+        self.parent = parent
 
+        self.start = None
+        self.end = None
+        self.endchar = re.compile("[^\w\W]")
+        self.offset = 0
 
-def get_regex_instances(text, regex):
-    """
-        a function to get a list of all matches of the given regex in text
+        self.subcontent = []
 
-    :param text:    {str}           text to be checked for occurrences of the regex pattern
-    :param regex:   {re.Pattern}    regex pattern to search for in text
+        self.subcontent_classes = [_Bracket,
+                                   _StraightBracket,
+                                   _CurvedBracket,
+                                   _SingleString,
+                                   _DoubleString,
+                                   _FormattingSingleString,
+                                   _FormattingDoubleString,
+                                   _SingleMultilineString,
+                                   _DoubleMultilineString,
+                                   _Comment]
 
-    :return:        {list}          list of all occurrences of the regex pattern in text
-    """
-    ret = []
-
-    while True:
-        new_match = regex.search(text)
-        if not new_match:
-            break
-        ret.append(new_match.group(0))
-        text = regex.sub("", text, 1)
-    return ret
-
-
-def check_in_str(line):
-    in_str = False
-    for c in range(len(line[0])):
-        if in_str:
-            if line[0][c] == in_str and not line[0][c - 1] == "\\":
-                in_str = False
-        elif line[0][c] == '"' and not line[0][c - 1] == "\\":
-            in_str = '"'
-        elif line[0][c] == "'" and not line[0][c - 1] == "\\":
-            in_str = "'"
-        elif line[0][c] == "#":
-            in_str = True
-            break
-
-    if not in_str:
-        return False
-    return True
+    def parse(self, start=0):
+        self.start = start
+        if type(self) == Parser:
+            c = 0
+        else:
+            c = 1
+        while c < len(self.text):
+            new_sub = None
+            for sub in self.subcontent_classes:
+                if sub.before.match(self.text[c-1]) and sub.current.match(self.text[c]) and \
+                        sub.after.match(self.text[c+1:]):
+                    new_sub = sub(self.text[c:], self)
+                    break
+            if new_sub:
+                delta = new_sub.parse(start=c)
+                self.subcontent.append(new_sub)
+                c += delta
+            elif self.endchar.match(self.text[c:]):
+                self.text = self.text[:c+self.offset]
+                return c + self.offset
+            else:
+                c += 1
 
 
-def get_parameters(line):
-    pass
+class _Bracket(Parser):
+
+    before = re.compile(r"[\w\W]")
+    current = re.compile(r"\(")
+    after = re.compile(r"[\w\W]")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r"\)")
+        self.offset = 1
 
 
-comment_checks = [re.compile("[^#]*\"{3}|\'{3}"),
-                  re.compile("[^\"]*\"[^\"]*\'{3}"),
-                  re.compile("[^\']*\'[^\']*\"{3}"),
-                  re.compile("[^\"\'#]*(([^\"\'#]*\"[^\"\'#]*#?[^\"\'#]*\")|([^\"\'#]*\'[^\"\'#]*#?[^\"\'#]*\'))*[^\"\'#]*#"),
-                  re.compile("\"{3}")]
-func_checks = [re.compile(r"[ ]*def [a-zA-Z0-9_]+\(")]
-class_checks = [re.compile(r"[ ]*class [a-zA-Z0-9_]+(\([a-zA-Z0-9_\.]*\))?:")]
-line_checks = [re.compile(r"[ ]*[a-zA-Z0-9_]+")]
+class _StraightBracket(Parser):
 
-standard_classregex = {"main": None,
-                       "parameter_start": r"[\s]*:param ",
-                       "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                       "return_start": None,
-                       "return_end": None,
-                       "raise_start": None,
-                       "raise_end": None}
+    before = re.compile(r"[\w\W]")
+    current = re.compile(r"\[")
+    after = re.compile(r"[\w\W]")
 
-standard_functionregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
-                          "parameter_start": r"[\s]*:param ",
-                          "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                          "return_start": r"[\s]*:return:",
-                          "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
-                          "raise_start": r"[\s]*:raise:[\s]+",
-                          "raise_end": r"[\s]*\n"}
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
 
-standard_methodregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
-                        "parameter_start": r"[\s]*:param ",
-                        "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                        "return_start": r"[\s]*:return:",
-                        "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
-                        "raise_start": r"[\s]*:raise:[\s]+",
-                          "raise_end": r"[\s]*\n"}
+        self.endchar = re.compile(r"]")
+        self.offset = 1
 
+
+class _CurvedBracket(Parser):
+
+    before = re.compile(r"[\w\W]")
+    current = re.compile(r"{")
+    after = re.compile(r"[\w\W]")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r"}")
+        self.offset = 1
+
+
+class _SingleString(Parser):
+
+    before = re.compile(r"[^\\'f]")
+    current = re.compile(r"'")
+    after = re.compile(r"[^']|([^']{2})")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r"[^\\]'")
+        self.offset = 2
+
+        self.subcontent_classes = []
+
+
+class _DoubleString(Parser):
+
+    before = re.compile(r"[^\\\"f]")
+    current = re.compile(r"\"")
+    after = re.compile(r"[^\"]|([^\"]{2})")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r'[^\\]"')
+        self.offset = 2
+
+        self.subcontent_classes = []
+
+
+class _FormattingSingleString(Parser):
+
+    before = re.compile(r"f")
+    current = re.compile(r"'")
+    after = re.compile(r"[^']|([^']{2})")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r"[^\\]'")
+        self.offset = 2
+
+        self.subcontent_classes = [_CurvedBracket]
+
+
+class _FormattingDoubleString(Parser):
+
+    before = re.compile(r"f")
+    current = re.compile(r"\"")
+    after = re.compile(r"[^\"]|([^\"]{2})")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r'[^\\]"')
+        self.offset = 2
+
+        self.subcontent_classes = [_CurvedBracket]
+
+
+class _SingleMultilineString(Parser):
+
+    before = re.compile(r"[^\\]")
+    current = re.compile(r"'")
+    after = re.compile(r"''")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r"[^\\]'''")
+        self.offset = 4
+
+        self.subcontent_classes = []
+
+
+class _DoubleMultilineString(Parser):
+
+    before = re.compile(r"[^\\]")
+    current = re.compile(r"\"")
+    after = re.compile(r"\"\"")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r'[^\\]"""')
+        self.offset = 4
+
+        self.subcontent_classes = []
+
+
+class _Comment(Parser):
+
+    before = re.compile(r"[\w\W]")
+    current = re.compile(r"#")
+    after = re.compile(r"[\w\W]")
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+
+        self.endchar = re.compile(r'[^\\]\n')
+        self.offset = 2
+
+        self.subcontent_classes = []
