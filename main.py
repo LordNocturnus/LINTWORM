@@ -1,11 +1,11 @@
 import re
 
 import parser
-
+import util
 
 if __name__ == "__main__":
 
-    text = open("G:/pythonprojects/NEST/WIZARD/git/commands.py", "r").read()
+    text = util.replace_tabs(open("G:/pythonprojects/NEST/LINTWORM/parser.py", "r").read())
     test = parser.Parser(text)
-    test.parse()
+    _ = test.parse()
     print("finished")
