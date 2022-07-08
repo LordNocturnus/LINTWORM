@@ -87,26 +87,26 @@ class_checks = [re.compile(r"[ ]*class [a-zA-Z0-9_]+(\([a-zA-Z0-9_\.]*\))?:")]
 line_checks = [re.compile(r"[ ]*[a-zA-Z0-9_]+")]
 
 standard_classregex = {"main": None,
-                       "parameter_start": r"[\s]*:param ",
-                       "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
+                       "parameter_start": r"[ ]*:param ",
+                       "parameter_end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                        "return_start": None,
                        "return_end": None,
                        "raise_start": None,
                        "raise_end": None}
 
-standard_functionregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
-                          "parameter_start": r"[\s]*:param ",
-                          "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                          "return_start": r"[\s]*:return:",
-                          "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
-                          "raise_start": r"[\s]*:raise:[\s]+",
-                          "raise_end": r"[\s]*\n"}
+standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+                          "parameter_start": r"[ ]*:param ",
+                          "parameter_end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                          "return_start": r"[ ]*:return:",
+                          "return_end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                          "raise_start": r"[ ]*:raise:[ ]+",
+                          "raise_end": r"[ ]*\n"}
 
-standard_methodregex = {"main": re.compile(r'[\s]*"""\n([\s]+[^{}]+\n)+(([\s]*:param [\w]+:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?(([\s]*:return:[\s]+{[\w.]+}([\s]+[^:\n]+\n)+)+\n)?([\s]*:raise:[\s]+[\w.]+[\s]*\n)*[\s]*"""\n'),
-                        "parameter_start": r"[\s]*:param ",
-                        "parameter_end": r":[\s]+{[\w.]+}([\s]+[^:\n]+\n)*[\s]+[^:\n]+",
-                        "return_start": r"[\s]*:return:",
-                        "return_end": r"[\s]+{[\w.]+}([\s]+[^:\n]+\n)+",
-                        "raise_start": r"[\s]*:raise:[\s]+",
-                          "raise_end": r"[\s]*\n"}
+standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+                        "parameter_start": r"[ ]*:param ",
+                        "parameter_end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                        "return_start": r"[ ]*:return:",
+                        "return_end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                        "raise_start": r"[ ]*:raise:[ ]+",
+                        "raise_end": r"[ ]*\n"}
 

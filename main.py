@@ -22,6 +22,7 @@ def simple_start(path, report_path=None, classregex=parser.standard_classregex, 
     classregex["parameter_start"] = re.compile(classregex["parameter_start"])
     classregex["parameter_end"] = re.compile(classregex["parameter_end"])
 
+    functionregex["main"] = re.compile(functionregex["main"])
     functionregex["parameter_line"] = re.compile(functionregex["parameter_start"] + r"[\w]+" +
                                                  functionregex["parameter_end"])
     functionregex["parameter_start"] = re.compile(functionregex["parameter_start"])
@@ -34,6 +35,7 @@ def simple_start(path, report_path=None, classregex=parser.standard_classregex, 
     functionregex["raise_start"] = re.compile(functionregex["raise_start"])
     functionregex["raise_end"] = re.compile(functionregex["raise_end"])
 
+    methodregex["main"] = re.compile(methodregex["main"])
     methodregex["parameter_line"] = re.compile(methodregex["parameter_start"] + r"[\w]+" +
                                                methodregex["parameter_end"])
     methodregex["parameter_start"] = re.compile(methodregex["parameter_start"])
