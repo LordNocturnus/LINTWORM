@@ -35,7 +35,8 @@ class Parser(object):
                                    _Class,
                                    _Parameter,
                                    _Return,
-                                   _Raise]
+                                   _Raise,
+                                   _Property]
 
         self.basic_comments = False
         self.ml_comment = False
@@ -208,18 +209,6 @@ class Parser(object):
         for s in self.subcontent:
             ret += s.parameter_check()
         return ret
-
-    def input_check(self):
-        for s in self.subcontent:
-            s.input_check()
-
-    def return_check(self):
-        for s in self.subcontent:
-            s.return_check()
-
-    def raise_check(self):
-        for s in self.subcontent:
-            s.raise_check()
 
 
 class _Bracket(Parser):
@@ -478,9 +467,14 @@ class _Function(Parser):
     def name(self):
         return self.text.split("\n")[0].split("(")[0][4:]
 
-    def input_check(self):
+    def parameter_check(self):
+        ret = []
         for s in self.subcontent:
-            s.input_check()
+            ret += s.parameter_check()
+            if isinstance(s, _Return):
+                self.returns += 1
+            elif isinstance(s, _Raise):
+                self.raises.append(s.name)
 
         for s in self.subcontent:
             if isinstance(s, _Bracket):
@@ -490,17 +484,7 @@ class _Function(Parser):
                     inputs[i] = inputs[i].strip().split("=")[0]
                 self.inputs = inputs
                 break
-
-    def return_check(self):
-        for s in self.subcontent:
-            if isinstance(s, _Return):
-                self.returns += 1
-
-    def raise_check(self):
-        for s in self.subcontent:
-            s.raise_check()
-            if isinstance(s, _Raise):
-                self.raises.append(s.name)
+        return ret
 
 
 class _Method(Parser):
@@ -521,9 +505,14 @@ class _Method(Parser):
     def name(self):
         return self.text.split("\n")[0].split("(")[0][4:]
 
-    def input_check(self):
+    def parameter_check(self):
+        ret = []
         for s in self.subcontent:
-            s.input_check()
+            ret += s.parameter_check()
+            if isinstance(s, _Return):
+                self.returns += 1
+            elif isinstance(s, _Raise):
+                self.raises.append(s.name)
 
         for s in self.subcontent:
             if isinstance(s, _Bracket):
@@ -536,11 +525,7 @@ class _Method(Parser):
                     inputs.pop(inputs.index("self"))
                 self.inputs = inputs
                 break
-
-    def return_check(self):
-        for s in self.subcontent:
-            if isinstance(s, _Return):
-                self.returns += 1
+        return ret
 
 
 class _Class(Parser):
@@ -557,6 +542,7 @@ class _Class(Parser):
 
         self.subcontent_classes.pop(self.subcontent_classes.index(_Function))
         self.subcontent_classes.append(_Method)
+        self.subcontent_classes.append(_ClassParameter)
 
         self.defstr = "class"
 
@@ -567,6 +553,7 @@ class _Class(Parser):
     def parameter_check(self):
         for s in self.subcontent:
             self.parameters += s.parameter_check()
+        self.parameters = list(set(self.parameters))
         return []
 
 
@@ -644,3 +631,69 @@ class _Raise(Parser):
             df = sub.report(df, columns)
 
         return df
+
+
+class _Property(Parser):
+
+    before = re.compile(r"\W")
+    current = re.compile(r"@")
+    after = re.compile(r"property")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# d]')
+        self.offset = 0
+
+        self.subcontent_classes.pop(self.subcontent_classes.index(_Function))
+        self.subcontent_classes.append(_Method)
+
+        self.defstr = "property"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
+
+    @property
+    def name(self):
+        for s in self.subcontent:
+            if isinstance(s, (_Method, _Function)):
+                return s.name
+
+    def parameter_check(self):
+        ret = [self.name]
+        for s in self.subcontent:
+            ret += s.parameter_check()
+        return ret
+
+
+class _ClassParameter(Parser):
+
+    before = re.compile(r"\W")
+    current = re.compile(r"\w")
+    after = re.compile(r"[\w]*[ ]+=")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(r'\W')
+        self.offset = 0
+
+        self.subcontent_classes = []
+
+        self.defstr = "class parameter"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
+
+    @property
+    def name(self):
+        return self.text
+
+    def parameter_check(self):
+        return [self.name]
