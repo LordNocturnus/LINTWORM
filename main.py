@@ -58,4 +58,4 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/WIZARD")
+    test = lintworm("G:/pythonprojects/NEST/test")

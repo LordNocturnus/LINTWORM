@@ -127,11 +127,11 @@ class _Parser(object):
                 sub_ml_comment.append(s.ml_comment)
                 sub_ml_formatted.append(s.ml_formatted)
                 documented.append(s.documented)
-        if all(sub_ml_comment) and not len(sub_ml_comment) == 0:
+        if all(sub_ml_comment) and (not len(sub_ml_comment) == 0 or type(self) == _Parser):
             self.ml_comment = True
-        if all(sub_ml_formatted) and not len(sub_ml_formatted) == 0:
+        if all(sub_ml_formatted) and (not len(sub_ml_formatted) == 0 or type(self) == _Parser):
             self.ml_formatted = True
-        if all(documented) and not len(documented) == 0:
+        if all(documented) and (not len(documented) == 0 or type(self) == _Parser):
             self.documented = True
 
     def report(self, df, columns):
@@ -403,37 +403,40 @@ class _SingleMultilineString(_Parser):
             regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
+        else:
+            regex = False
 
-        if regex["main"].match(self.text):
-            self.ml_formatted = True
-            param = util.get_regex_instances(self.text, regex["parameter main"])
-            for p in param:
-                p = regex["parameter start"].sub("", p)
-                p = regex["parameter end"].sub("", p)
-                if isinstance(self.parent, _Class):
-                    self.parent.found_parameters.append(p)
-                else:
-                    self.parent.found_inputs.append(p)
-            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
-            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+        if regex:
+            if regex["main"].match(self.text):
+                self.ml_formatted = True
+                param = util.get_regex_instances(self.text, regex["parameter main"])
+                for p in param:
+                    p = regex["parameter start"].sub("", p)
+                    p = regex["parameter end"].sub("", p)
+                    if isinstance(self.parent, _Class):
+                        self.parent.found_parameters.append(p)
+                    else:
+                        self.parent.found_inputs.append(p)
+                self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+                self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
 
-            ret = util.get_regex_instances(self.text, regex["return main"])
-            for r in ret:
-                r = regex["return start"].sub("", r)
-                r = regex["return end"].sub("", r)
-                if r == "":
-                    self.parent.found_returns += 1
+                ret = util.get_regex_instances(self.text, regex["return main"])
+                for r in ret:
+                    r = regex["return start"].sub("", r)
+                    r = regex["return end"].sub("", r)
+                    if r == "":
+                        self.parent.found_returns += 1
 
-            rai = util.get_regex_instances(self.text, regex["raise main"])
-            for r in rai:
-                r = regex["raise start"].sub("", r)
-                r = regex["raise end"].sub("", r)
-                self.parent.found_raises.append(r)
-            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+                rai = util.get_regex_instances(self.text, regex["raise main"])
+                for r in rai:
+                    r = regex["raise start"].sub("", r)
+                    r = regex["raise end"].sub("", r)
+                    self.parent.found_raises.append(r)
+                self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
 
-            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-                    len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
-                self.parent.documented = True
+                if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                    self.parent.documented = True
 
     def report(self, df, columns):
         for sub in self.subcontent:
@@ -467,37 +470,40 @@ class _DoubleMultilineString(_Parser):
             regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
+        else:
+            regex = False
 
-        if regex["main"].match(self.text):
-            self.ml_formatted = True
-            param = util.get_regex_instances(self.text, regex["parameter main"])
-            for p in param:
-                p = regex["parameter start"].sub("", p)
-                p = regex["parameter end"].sub("", p)
-                if isinstance(self.parent, _Class):
-                    self.parent.found_parameters.append(p)
-                else:
-                    self.parent.found_inputs.append(p)
-            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
-            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+        if regex:
+            if regex["main"].match(self.text):
+                self.ml_formatted = True
+                param = util.get_regex_instances(self.text, regex["parameter main"])
+                for p in param:
+                    p = regex["parameter start"].sub("", p)
+                    p = regex["parameter end"].sub("", p)
+                    if isinstance(self.parent, _Class):
+                        self.parent.found_parameters.append(p)
+                    else:
+                        self.parent.found_inputs.append(p)
+                self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+                self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
 
-            ret = util.get_regex_instances(self.text, regex["return main"])
-            for r in ret:
-                r = regex["return start"].sub("", r)
-                r = regex["return end"].sub("", r)
-                if r == "":
-                    self.parent.found_returns += 1
+                ret = util.get_regex_instances(self.text, regex["return main"])
+                for r in ret:
+                    r = regex["return start"].sub("", r)
+                    r = regex["return end"].sub("", r)
+                    if r == "":
+                        self.parent.found_returns += 1
 
-            rai = util.get_regex_instances(self.text, regex["raise main"])
-            for r in rai:
-                r = regex["raise start"].sub("", r)
-                r = regex["raise end"].sub("", r)
-                self.parent.found_raises.append(r)
-            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+                rai = util.get_regex_instances(self.text, regex["raise main"])
+                for r in rai:
+                    r = regex["raise start"].sub("", r)
+                    r = regex["raise end"].sub("", r)
+                    self.parent.found_raises.append(r)
+                self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
 
-            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-               len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
-                self.parent.documented = True
+                if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+                   len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                    self.parent.documented = True
 
     def report(self, df, columns):
         for sub in self.subcontent:
