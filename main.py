@@ -1,60 +1,68 @@
+from datetime import datetime
 import pandas as pd
+import os
 
 import parser
 import util
 
 
-def lintworm(path, reportpath, reportname=None, classregex=util.standard_classregex, functionregex=util.standard_functionregex,
-             methodregex=util.standard_methodregex):
+def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
+             functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
+             columns=util.standard_columns):
 
     regex = {"class": util.process_regex(classregex),
              "function": util.process_regex(functionregex),
              "method": util.process_regex(methodregex)}
 
+    if not report_name:
+        report_name = "LintwormReport_" + datetime.now().strftime("%H_%M_%S") + ".csv"
+
+    report_path = str(os.path.join(os.path.abspath(report_path), os.path.normpath(report_name)))
+    columns.append("basic comments")
+    columns.append("multiline comments")
+    columns.append("formatted multiline")
+    columns.append("Documented")
+
+    paths = []
+    if os.path.isfile(path):
+        if path[-3:] == ".py":
+            paths.append(path)
+    else:
+        for p, subdirs, files in os.walk(path):
+            for name in files:
+                if name[-3:] == ".py":
+                    paths.append(os.path.join(p, name))
+
+    for p in paths:
+        try:
+            text = open(p, "r").read()
+            if "\t" in text:
+                text = util.replace_tabs(text)
+
+            code = parser._Parser(text, p, regex)
+
+            code.parse()
+            code.parameter_check()
+            code.check()
+
+        except UnicodeDecodeError:
+            code = parser._Parser("", p, regex)
+
+        try:
+            df = pd.read_csv(report_path)
+        except OSError:
+            df = pd.DataFrame([], columns=columns)
+
+        df = code.report(df, columns)
+        df.to_csv(report_path, index=False)
+
+        print("finished:", p)
+
+    try:
+        return pd.read_csv(report_path)
+    except OSError:
+        return pd.DataFrame([], columns=columns)
+
+
 if __name__ == "__main__":
-    columns = ["path",
-               "name",
-               "type",
-               "start line",
-               "end line",
-               # "inputs",
-               # "found inputs",
-               "missing inputs",
-               "returns",
-               "found returns",
-               # "raises",
-               # "found raises",
-               "missing raises",
-               # "parameters",
-               # "found parameters",
-               "missing parameters",
-               "basic comments",
-               "multiline comments",
-               "formatted multiline",
-               "Documented"]
-
-    regex = {"class": util.process_regex(util.standard_classregex),
-             "function": util.process_regex(util.standard_functionregex),
-             "method": util.process_regex(util.standard_methodregex)}
-
-    df = pd.DataFrame([], columns=columns)
-    text = util.replace_tabs(open("G:/pythonprojects/NEST/LINTWORM/parser.py", "r").read())
-    test1 = parser._Parser(text, "G:/pythonprojects/NEST/LINTWORM/parser.py", regex)
-    test1.parse()
-    test1.parameter_check()
-    test1.check()
-    df = test1.report(df, columns)
-    df.to_csv("G:/pythonprojects/NEST/LINTWORM/Report_1.csv", index=False)
-
-    print("finished 1")
-
-    df = pd.DataFrame([], columns=columns)
-    text = util.replace_tabs(open("G:/pythonprojects/NEST/WIZARD/git/commands.py", "r").read())
-    test2 = parser._Parser(text, "G:/pythonprojects/NEST/WIZARD/git/commands.py", regex)
-    test2.parse()
-    test2.parameter_check()
-    test2.check()
-    df = test2.report(df, columns)
-    df.to_csv("G:/pythonprojects/NEST/LINTWORM/Report_2.csv", index=False)
-
-    print("finished 2")
+    test = lintworm("G:/pythonprojects/NEST/test")

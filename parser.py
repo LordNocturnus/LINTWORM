@@ -35,7 +35,9 @@ class _Parser(object):
                                    _Parameter,
                                    _Return,
                                    _Raise,
-                                   _Property]
+                                   _Property,
+                                   _Argument,
+                                   _Yield]
 
         self.basic_comments = False
         self.ml_comment = False
@@ -44,11 +46,13 @@ class _Parser(object):
 
         self.inputs = []
         self.returns = 0
+        self.yields = 0
         self.raises = []
         self.parameters = []
 
         self.found_inputs = []
         self.found_returns = 0
+        self.found_yields = 0
         self.found_raises = []
         self.found_parameters = []
 
@@ -57,6 +61,10 @@ class _Parser(object):
     @property
     def name(self):
         return ""
+
+    @property
+    def ret_offset(self):
+        return self.offset
 
     @property
     def pure_text(self):
@@ -89,7 +97,7 @@ class _Parser(object):
             elif self.endchar.match(self.text[c:]):
                 self.text = self.text[:c+self.offset]
                 self.end = self.start + len(self.text)
-                return c + self.offset
+                return c + self.ret_offset
             elif self.text[c] == "\n":
                 c += 1
                 current_indent = 0
@@ -123,11 +131,17 @@ class _Parser(object):
                 sub_ml_comment.append(s.ml_comment)
                 sub_ml_formatted.append(s.ml_formatted)
                 documented.append(s.documented)
-        if all(sub_ml_comment) and not len(sub_ml_comment) == 0:
+        if all(sub_ml_comment) and not len(sub_ml_comment) == 0 and not isinstance(self, (_Class, _Function, _Method)):
             self.ml_comment = True
-        if all(sub_ml_formatted) and not len(sub_ml_formatted) == 0:
+        if all(sub_ml_formatted) and not len(sub_ml_formatted) == 0 and not isinstance(self, (_Class, _Function,
+                                                                                              _Method)):
             self.ml_formatted = True
-        if all(documented) and not len(documented) == 0:
+        if all(documented) and not len(documented) == 0 and not isinstance(self, (_Class, _Function, _Method)):
+            self.documented = True
+        if type(self) == _Parser and len(sub_ml_comment) == 0 and len(sub_ml_formatted) == 0 and len(documented) == 0:
+            self.basic_comments = True
+            self.ml_comment = True
+            self.ml_formatted = True
             self.documented = True
 
     def report(self, df, columns):
@@ -143,12 +157,12 @@ class _Parser(object):
             data.append(self.defstr)
             col.append("type")
 
-        if "start line" in columns:
+        if "start char" in columns:
             data.append(self.start + 1)
-            col.append("start line")
-        if "end line" in columns:
+            col.append("start char")
+        if "end char" in columns:
             data.append(self.end + 1)
-            col.append("end line")
+            col.append("end char")
 
         if "inputs" in columns:
             data.append(":".join(self.inputs))
@@ -166,6 +180,13 @@ class _Parser(object):
         if "found returns" in columns:
             data.append(self.found_returns)
             col.append("found returns")
+
+        if "yields" in columns:
+            data.append(self.yields)
+            col.append("yields")
+        if "found yields" in columns:
+            data.append(self.found_yields)
+            col.append("found yields")
 
         if "raises" in columns:
             data.append(":".join(self.raises))
@@ -271,6 +292,10 @@ class _CurvedBracket(_Parser):
 
         self.defstr = "curved bracket"
 
+    @property
+    def ret_offset(self):
+        return 0
+
     def report(self, df, columns):
         for sub in self.subcontent:
             df = sub.report(df, columns)
@@ -303,9 +328,9 @@ class _SingleString(_Parser):
 
 class _DoubleString(_Parser):
 
-    before = re.compile(r"[^\\\"f]")
-    current = re.compile(r"\"")
-    after = re.compile(r"[^\"]|([^\"]{2})")
+    before = re.compile(r'[^\\"f]')
+    current = re.compile(r'"')
+    after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
@@ -350,8 +375,8 @@ class _FormattingSingleString(_Parser):
 class _FormattingDoubleString(_Parser):
 
     before = re.compile(r"f")
-    current = re.compile(r"\"")
-    after = re.compile(r"[^\"]|([^\"]{2})")
+    current = re.compile(r'"')
+    after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
@@ -395,37 +420,48 @@ class _SingleMultilineString(_Parser):
             regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
+        else:
+            regex = None
 
-        if regex["main"].match(self.text):
-            self.ml_formatted = True
-            param = util.get_regex_instances(self.text, regex["parameter main"])
-            for p in param:
-                p = regex["parameter start"].sub("", p)
-                p = regex["parameter end"].sub("", p)
-                if isinstance(self.parent, _Class):
-                    self.parent.found_parameters.append(p)
-                else:
-                    self.parent.found_inputs.append(p)
-            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
-            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+        if regex:
+            if regex["main"].match(self.text):
+                self.ml_formatted = True
+                param = util.get_regex_instances(self.text, regex["parameter main"])
+                for p in param:
+                    p = regex["parameter start"].sub("", p)
+                    p = regex["parameter end"].sub("", p)
+                    if isinstance(self.parent, _Class):
+                        self.parent.found_parameters.append(p)
+                    else:
+                        self.parent.found_inputs.append(p)
+                self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+                self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
 
-            ret = util.get_regex_instances(self.text, regex["return main"])
-            for r in ret:
-                r = regex["return start"].sub("", r)
-                r = regex["return end"].sub("", r)
-                if r == "":
-                    self.parent.found_returns += 1
+                ret = util.get_regex_instances(self.text, regex["return main"])
+                for r in ret:
+                    r = regex["return start"].sub("", r)
+                    r = regex["return end"].sub("", r)
+                    if r == "":
+                        self.parent.found_returns += 1
 
-            rai = util.get_regex_instances(self.text, regex["raise main"])
-            for r in rai:
-                r = regex["raise start"].sub("", r)
-                r = regex["raise end"].sub("", r)
-                self.parent.found_raises.append(r)
-            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+                yie = util.get_regex_instances(self.text, regex["yield main"])
+                for y in yie:
+                    y = regex["yield start"].sub("", y)
+                    y = regex["yield end"].sub("", y)
+                    if y == "":
+                        self.parent.found_yields += 1
 
-            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-                    len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
-                self.parent.documented = True
+                rai = util.get_regex_instances(self.text, regex["raise main"])
+                for r in rai:
+                    r = regex["raise start"].sub("", r)
+                    r = regex["raise end"].sub("", r)
+                    self.parent.found_raises.append(r)
+                self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+
+                if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0 \
+                        and self.parent.found_yields - self.parent.yields == 0:
+                    self.parent.documented = True
 
     def report(self, df, columns):
         for sub in self.subcontent:
@@ -437,8 +473,8 @@ class _SingleMultilineString(_Parser):
 class _DoubleMultilineString(_Parser):
 
     before = re.compile(r"[^\\]")
-    current = re.compile(r"\"")
-    after = re.compile(r"\"\"")
+    current = re.compile(r'"')
+    after = re.compile(r'""')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
@@ -459,37 +495,48 @@ class _DoubleMultilineString(_Parser):
             regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
+        else:
+            regex = None
 
-        if regex["main"].match(self.text):
-            self.ml_formatted = True
-            param = util.get_regex_instances(self.text, regex["parameter main"])
-            for p in param:
-                p = regex["parameter start"].sub("", p)
-                p = regex["parameter end"].sub("", p)
-                if isinstance(self.parent, _Class):
-                    self.parent.found_parameters.append(p)
-                else:
-                    self.parent.found_inputs.append(p)
-            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
-            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+        if regex:
+            if regex["main"].match(self.text):
+                self.ml_formatted = True
+                param = util.get_regex_instances(self.text, regex["parameter main"])
+                for p in param:
+                    p = regex["parameter start"].sub("", p)
+                    p = regex["parameter end"].sub("", p)
+                    if isinstance(self.parent, _Class):
+                        self.parent.found_parameters.append(p)
+                    else:
+                        self.parent.found_inputs.append(p)
+                self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+                self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
 
-            ret = util.get_regex_instances(self.text, regex["return main"])
-            for r in ret:
-                r = regex["return start"].sub("", r)
-                r = regex["return end"].sub("", r)
-                if r == "":
-                    self.parent.found_returns += 1
+                ret = util.get_regex_instances(self.text, regex["return main"])
+                for r in ret:
+                    r = regex["return start"].sub("", r)
+                    r = regex["return end"].sub("", r)
+                    if r == "":
+                        self.parent.found_returns += 1
 
-            rai = util.get_regex_instances(self.text, regex["raise main"])
-            for r in rai:
-                r = regex["raise start"].sub("", r)
-                r = regex["raise end"].sub("", r)
-                self.parent.found_raises.append(r)
-            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+                yie = util.get_regex_instances(self.text, regex["yield main"])
+                for y in yie:
+                    y = regex["yield start"].sub("", y)
+                    y = regex["yield end"].sub("", y)
+                    if y == "":
+                        self.parent.found_yields += 1
 
-            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-               len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
-                self.parent.documented = True
+                rai = util.get_regex_instances(self.text, regex["raise main"])
+                for r in rai:
+                    r = regex["raise start"].sub("", r)
+                    r = regex["raise end"].sub("", r)
+                    self.parent.found_raises.append(r)
+                self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+
+                if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0 \
+                        and self.parent.found_yields - self.parent.yields == 0:
+                    self.parent.documented = True
 
     def report(self, df, columns):
         for sub in self.subcontent:
@@ -504,8 +551,8 @@ class _Comment(_Parser):
     current = re.compile(r"#")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, parent=None, indent=0):
-        super().__init__(text, parent, indent)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]\n')
         self.offset = 2
@@ -546,6 +593,8 @@ class _Function(_Parser):
             ret += s.parameter_check()
             if isinstance(s, _Return):
                 self.returns += 1
+            elif isinstance(s, _Yield):
+                self.yields += 1
             elif isinstance(s, _Raise):
                 self.raises.append(s.name)
 
@@ -584,6 +633,8 @@ class _Method(_Parser):
             ret += s.parameter_check()
             if isinstance(s, _Return):
                 self.returns += 1
+            elif isinstance(s, _Yield):
+                self.yields += 1
             elif isinstance(s, _Raise):
                 self.raises.append(s.name)
 
@@ -603,7 +654,7 @@ class _Method(_Parser):
 
 class _Class(_Parser):
 
-    before = re.compile(r"[\n ]")
+    before = re.compile(r"\s")
     current = re.compile(r"c")
     after = re.compile(r"lass ")
 
@@ -770,3 +821,49 @@ class _ClassParameter(_Parser):
 
     def parameter_check(self):
         return [self.name]
+
+
+class _Argument(_Parser):
+
+    before = re.compile(r"[\W\w]")
+    current = re.compile(r"\n")
+    after = re.compile(r"[ ]*@[^\Wp]")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(f'\n')
+        self.offset = 0
+
+        self.defstr = "argument"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
+
+    @property
+    def name(self):
+        return self.text[1:]
+
+
+class _Yield(_Parser):
+
+    before = re.compile(r"\W")
+    current = re.compile(r"y")
+    after = re.compile(r"ield ")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(r'[\n#]')
+        self.offset = 0
+
+        self.defstr = "yield"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df

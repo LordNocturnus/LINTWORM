@@ -33,6 +33,10 @@ def process_regex(regex):
     ret["return start"] = re.compile(regex["return start"])
     ret["return end"] = re.compile(regex["return end"])
 
+    ret["yield main"] = re.compile(regex["yield start"] + regex["yield end"])
+    ret["yield start"] = re.compile(regex["yield start"])
+    ret["yield end"] = re.compile(regex["yield end"])
+
     ret["raise main"] = re.compile(regex["raise start"] + r"[\w.]+" + regex["raise end"])
     ret["raise start"] = re.compile(regex["raise start"])
     ret["raise end"] = re.compile(regex["raise end"])
@@ -60,26 +64,52 @@ def get_regex_instances(text, regex):
     return ret
 
 
-standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                        "parameter start": r"[ ]*:param ",
                        "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                        "return start": r"[ ]*:return:",
                        "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                       "yield start": r"[ ]*:return:",
+                       "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                        "raise start": r"[ ]*:raise:[ ]+",
                        "raise end": r"[\s]*\n"}
 
-standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                           "parameter start": r"[ ]*:param ",
                           "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                           "return start": r"[ ]*:return:",
                           "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                          "yield start": r"[ ]*:yield:",
+                          "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                           "raise start": r"[ ]*:raise:[ ]+",
                           "raise end": r"[\s]*\n"}
 
-standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                         "parameter start": r"[ ]*:param ",
                         "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                         "return start": r"[ ]*:return:",
                         "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                        "yield start": r"[ ]*:yield:",
+                        "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                         "raise start": r"[ ]*:raise:[ ]+",
                         "raise end": r"[ ]*\n"}
+
+standard_columns = ["path",
+                    "name",
+                    "type",
+                    # "start char",
+                    # "end char",
+                    # "inputs",
+                    # "found inputs",
+                    "missing inputs",
+                    "returns",
+                    "found returns",
+                    "yields",
+                    "found yields",
+                    # "raises",
+                    # "found raises",
+                    "missing raises",
+                    # "parameters",
+                    # "found parameters",
+                    "missing parameters",
+                    ]
