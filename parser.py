@@ -36,7 +36,8 @@ class _Parser(object):
                                    _Return,
                                    _Raise,
                                    _Property,
-                                   _Argument]
+                                   _Argument,
+                                   _Yield]
 
         self.basic_comments = False
         self.ml_comment = False
@@ -45,11 +46,13 @@ class _Parser(object):
 
         self.inputs = []
         self.returns = 0
+        self.yields = 0
         self.raises = []
         self.parameters = []
 
         self.found_inputs = []
         self.found_returns = 0
+        self.found_yields = 0
         self.found_raises = []
         self.found_parameters = []
 
@@ -177,6 +180,13 @@ class _Parser(object):
         if "found returns" in columns:
             data.append(self.found_returns)
             col.append("found returns")
+
+        if "yields" in columns:
+            data.append(self.yields)
+            col.append("yields")
+        if "found yields" in columns:
+            data.append(self.found_yields)
+            col.append("found yields")
 
         if "raises" in columns:
             data.append(":".join(self.raises))
@@ -411,7 +421,7 @@ class _SingleMultilineString(_Parser):
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
         else:
-            regex = False
+            regex = None
 
         if regex:
             if regex["main"].match(self.text):
@@ -434,6 +444,13 @@ class _SingleMultilineString(_Parser):
                     if r == "":
                         self.parent.found_returns += 1
 
+                yie = util.get_regex_instances(self.text, regex["yield main"])
+                for y in yie:
+                    y = regex["yield start"].sub("", y)
+                    y = regex["yield end"].sub("", y)
+                    if y == "":
+                        self.parent.found_yields += 1
+
                 rai = util.get_regex_instances(self.text, regex["raise main"])
                 for r in rai:
                     r = regex["raise start"].sub("", r)
@@ -442,7 +459,8 @@ class _SingleMultilineString(_Parser):
                 self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
 
                 if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0 \
+                        and self.parent.found_yields - self.parent.yields == 0:
                     self.parent.documented = True
 
     def report(self, df, columns):
@@ -478,7 +496,7 @@ class _DoubleMultilineString(_Parser):
         elif isinstance(self.parent, _Method):
             regex = self.regex["method"]
         else:
-            regex = False
+            regex = None
 
         if regex:
             if regex["main"].match(self.text):
@@ -501,6 +519,13 @@ class _DoubleMultilineString(_Parser):
                     if r == "":
                         self.parent.found_returns += 1
 
+                yie = util.get_regex_instances(self.text, regex["yield main"])
+                for y in yie:
+                    y = regex["yield start"].sub("", y)
+                    y = regex["yield end"].sub("", y)
+                    if y == "":
+                        self.parent.found_yields += 1
+
                 rai = util.get_regex_instances(self.text, regex["raise main"])
                 for r in rai:
                     r = regex["raise start"].sub("", r)
@@ -509,7 +534,8 @@ class _DoubleMultilineString(_Parser):
                 self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
 
                 if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-                   len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0 \
+                        and self.parent.found_yields - self.parent.yields == 0:
                     self.parent.documented = True
 
     def report(self, df, columns):
@@ -567,6 +593,8 @@ class _Function(_Parser):
             ret += s.parameter_check()
             if isinstance(s, _Return):
                 self.returns += 1
+            elif isinstance(s, _Yield):
+                self.yields += 1
             elif isinstance(s, _Raise):
                 self.raises.append(s.name)
 
@@ -605,6 +633,8 @@ class _Method(_Parser):
             ret += s.parameter_check()
             if isinstance(s, _Return):
                 self.returns += 1
+            elif isinstance(s, _Yield):
+                self.yields += 1
             elif isinstance(s, _Raise):
                 self.raises.append(s.name)
 
@@ -816,3 +846,24 @@ class _Argument(_Parser):
     @property
     def name(self):
         return self.text[1:]
+
+
+class _Yield(_Parser):
+
+    before = re.compile(r"\W")
+    current = re.compile(r"y")
+    after = re.compile(r"ield ")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(r'[\n#]')
+        self.offset = 0
+
+        self.defstr = "yield"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
