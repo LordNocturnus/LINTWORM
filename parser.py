@@ -135,6 +135,11 @@ class _Parser(object):
             self.ml_formatted = True
         if all(documented) and not len(documented) == 0 and not isinstance(self, (_Class, _Function, _Method)):
             self.documented = True
+        if type(self) == _Parser and len(sub_ml_comment) == 0 and len(sub_ml_formatted) == 0 and len(documented) == 0:
+            self.basic_comments = True
+            self.ml_comment = True
+            self.ml_formatted = True
+            self.documented = True
 
     def report(self, df, columns):
         data = []
