@@ -1,4 +1,6 @@
+import numpy as np
 import re
+import hashlib
 
 
 def replace_tabs(string):
@@ -62,6 +64,15 @@ def get_regex_instances(text, regex):
         ret.append(new_match.group(0))
         text = text.split(ret[-1])[1]
     return ret
+
+
+def check_hash(text, df, path):
+    text_hash = hashlib.sha256(text.encode()).hexdigest()
+    if path in np.asarray(df["path"]):
+        if np.asarray(df["hash"][df["path"] == path])[0] == text_hash:
+            return True, True, text_hash
+        return False, True, text_hash
+    return False, False, text_hash
 
 
 standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',

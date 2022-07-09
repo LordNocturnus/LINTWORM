@@ -8,7 +8,7 @@ import util
 
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
-             columns=util.standard_columns):
+             columns=util.standard_columns, hash_path=None):
 
     regex = {"class": util.process_regex(classregex),
              "function": util.process_regex(functionregex),
@@ -23,6 +23,15 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     columns.append("formatted multiline")
     columns.append("Documented")
 
+    df = pd.DataFrame([], columns=columns)
+
+    if hash_path:
+        try:
+            hash_df = pd.read_csv(hash_path)
+        except OSError:
+            hash_df = pd.DataFrame([], columns=["path", "basic comments", "multiline comments", "formatted multiline",
+                                                "Documented", "hash"])
+
     paths = []
     if os.path.isfile(path):
         if path[-3:] == ".py":
@@ -34,8 +43,22 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                     paths.append(os.path.join(p, name))
 
     for p in paths:
+        hashed = False
         try:
+            valid = True
             text = open(p, "r").read()
+            if hash_path:
+                hashed, in_df, text_hash = util.check_hash(text, hash_df, p)
+        except UnicodeDecodeError:
+            valid = False
+
+        if valid and hashed:
+            code = parser._Parser("", p, regex)
+            code.basic_comments = hash_df["basic comments"][hash_df["path"] == p]
+            code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p]
+            code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p]
+            code.documented = hash_df["Documented"][hash_df["path"] == p]
+        elif valid:
             if "\t" in text:
                 text = util.replace_tabs(text)
 
@@ -44,25 +67,34 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             code.parse()
             code.parameter_check()
             code.check()
-
-        except UnicodeDecodeError:
+        else:
             code = parser._Parser("", p, regex)
 
-        try:
-            df = pd.read_csv(report_path)
-        except OSError:
-            df = pd.DataFrame([], columns=columns)
+        df = code.report(pd.DataFrame([], columns=columns), columns)
+        if hash_path:
+            if not in_df:
+                print("hashing", p)
+                new_hash = pd.DataFrame([[p, code.basic_comments, code.ml_comment, code.ml_formatted, code.documented,
+                                          text_hash]], columns=["path", "basic comments", "multiline comments",
+                                                                "formatted multiline", "Documented", "hash"])
+                hash_df = pd.concat([hash_df, new_hash], ignore_index=True)
+            else:
+                hash_df["basic comments"][hash_df["path"] == p].loc[0] = code.basic_comments
+                hash_df["multiline comments"][hash_df["path"] == p].loc[0] = code.ml_comment
+                hash_df["formatted multiline"][hash_df["path"] == p].loc[0] = code.ml_formatted
+                hash_df["Documented"][hash_df["path"] == p].loc[0] = code.documented
+                hash_df["hash"][hash_df["path"] == p].loc[0] = text_hash
 
-        df = code.report(df, columns)
+        try:
+            df = pd.concat([pd.read_csv(report_path), df], ignore_index=True)
+        except OSError:
+            pass
         df.to_csv(report_path, index=False)
 
         print("finished:", p)
-
-    try:
-        return pd.read_csv(report_path)
-    except OSError:
-        return pd.DataFrame([], columns=columns)
+    hash_df.to_csv(hash_path, index=False)
+    return df
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/test")
+    test = lintworm("G:/pythonprojects/NEST/test", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
