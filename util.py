@@ -23,48 +23,50 @@ def replace_tabs(string):
 def process_regex(regex):
     ret = dict()
 
-    try:
-        ret["main"] = re.compile(regex["main"])
-    except TypeError:
-        ret["main"] = None
+    ret["main"] = re.compile(regex["main"])
 
-    try:
-        ret["parameter main"] = re.compile(regex["parameter start"] + r"[\w]+" + regex["parameter end"])
-        ret["parameter start"] = re.compile(regex["parameter start"])
-        ret["parameter end"] = re.compile(regex["parameter end"])
-    except TypeError:
-        ret["parameter main"] = None
-        ret["parameter start"] = None
-        ret["parameter end"] = None
+    ret["parameter main"] = re.compile(regex["parameter start"] + r"[\w]+" + regex["parameter end"])
+    ret["parameter start"] = re.compile(regex["parameter start"])
+    ret["parameter end"] = re.compile(regex["parameter end"])
 
-    try:
-        ret["return main"] = re.compile(regex["return start"] + regex["return end"])
-        ret["return start"] = re.compile(regex["return start"])
-        ret["return end"] = re.compile(regex["return end"])
-    except TypeError:
-        ret["return main"] = None
-        ret["return start"] = None
-        ret["return end"] = None
+    ret["return main"] = re.compile(regex["return start"] + regex["return end"])
+    ret["return start"] = re.compile(regex["return start"])
+    ret["return end"] = re.compile(regex["return end"])
 
-    try:
-        ret["raise main"] = re.compile(regex["raise start"] + r"[\w.]+" + regex["raise end"])
-        ret["raise start"] = re.compile(regex["raise start"])
-        ret["raise end"] = re.compile(regex["raise end"])
-    except TypeError:
-        ret["raise main"] = None
-        ret["raise start"] = None
-        ret["raise end"] = None
+    ret["raise main"] = re.compile(regex["raise start"] + r"[\w.]+" + regex["raise end"])
+    ret["raise start"] = re.compile(regex["raise start"])
+    ret["raise end"] = re.compile(regex["raise end"])
 
     return ret
 
 
-standard_classregex = {"main": None,
+def get_regex_instances(text, regex):
+    """
+        a function to get a list of all matches of the given regex in text
+
+    :param text:    {str}           text to be checked for occurrences of the regex pattern
+    :param regex:   {re.Pattern}    regex pattern to search for in text
+
+    :return:        {list}          list of all occurrences of the regex pattern in text
+    """
+    ret = []
+
+    while True:
+        new_match = regex.search(text)
+        if not new_match:
+            break
+        ret.append(new_match.group(0))
+        text = text.split(ret[-1])[1]
+    return ret
+
+
+standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                        "parameter start": r"[ ]*:param ",
                        "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
-                       "return start": None,
-                       "return end": None,
-                       "raise start": None,
-                       "raise end": None}
+                       "return start": r"[ ]*:return:",
+                       "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                       "raise start": r"[ ]*:raise:[ ]+",
+                       "raise end": r"[\s]*\n"}
 
 standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                           "parameter start": r"[ ]*:param ",

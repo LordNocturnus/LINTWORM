@@ -3,23 +3,31 @@ import pandas as pd
 import parser
 import util
 
+
+def lintworm(path, reportpath, reportname=None, classregex=util.standard_classregex, functionregex=util.standard_functionregex,
+             methodregex=util.standard_methodregex):
+
+    regex = {"class": util.process_regex(classregex),
+             "function": util.process_regex(functionregex),
+             "method": util.process_regex(methodregex)}
+
 if __name__ == "__main__":
     columns = ["path",
                "name",
                "type",
                "start line",
                "end line",
-               "inputs",
+               # "inputs",
                # "found inputs",
-               # "missing inputs",
+               "missing inputs",
                "returns",
-               # "found returns",
-               "raises",
+               "found returns",
+               # "raises",
                # "found raises",
-               # "missing raises",
-               "parameters",
+               "missing raises",
+               # "parameters",
                # "found parameters",
-               # "missing parameters",
+               "missing parameters",
                "basic comments",
                "multiline comments",
                "formatted multiline",
@@ -31,7 +39,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame([], columns=columns)
     text = util.replace_tabs(open("G:/pythonprojects/NEST/LINTWORM/parser.py", "r").read())
-    test1 = parser.Parser(text, "G:/pythonprojects/NEST/LINTWORM/parser.py", regex)
+    test1 = parser._Parser(text, "G:/pythonprojects/NEST/LINTWORM/parser.py", regex)
     test1.parse()
     test1.parameter_check()
     test1.check()
@@ -42,7 +50,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame([], columns=columns)
     text = util.replace_tabs(open("G:/pythonprojects/NEST/WIZARD/git/commands.py", "r").read())
-    test2 = parser.Parser(text, "G:/pythonprojects/NEST/WIZARD/git/commands.py", regex)
+    test2 = parser._Parser(text, "G:/pythonprojects/NEST/WIZARD/git/commands.py", regex)
     test2.parse()
     test2.parameter_check()
     test2.check()

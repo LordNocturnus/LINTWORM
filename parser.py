@@ -1,11 +1,10 @@
 import pandas as pd
 import re
-import copy
 
 import util
 
 
-class Parser(object):
+class _Parser(object):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         self.text = text
@@ -41,7 +40,7 @@ class Parser(object):
         self.basic_comments = False
         self.ml_comment = False
         self.ml_formatted = False
-        self.ml_complete = False
+        self.documented = False
 
         self.inputs = []
         self.returns = 0
@@ -61,7 +60,7 @@ class Parser(object):
 
     @property
     def pure_text(self):
-        text = copy.deepcopy(self.text)
+        text = self.text
         for s in self.subcontent:
             text = text.replace(s.text, "")
         return text
@@ -70,7 +69,7 @@ class Parser(object):
         self.start = start
         current_indent = self.indent
 
-        if type(self) == Parser:
+        if type(self) == _Parser:
             c = 0
         else:
             c = 1
@@ -110,6 +109,7 @@ class Parser(object):
     def check(self):
         sub_ml_comment = []
         sub_ml_formatted = []
+        documented = []
         for s in self.subcontent:
             s.check()
             if isinstance(s, _Comment) or s.basic_comments:
@@ -122,10 +122,13 @@ class Parser(object):
             elif isinstance(s, (_Class, _Function, _Method)):
                 sub_ml_comment.append(s.ml_comment)
                 sub_ml_formatted.append(s.ml_formatted)
-        if all(sub_ml_comment):
+                documented.append(s.documented)
+        if all(sub_ml_comment) and not len(sub_ml_comment) == 0:
             self.ml_comment = True
-        if all(sub_ml_formatted):
+        if all(sub_ml_formatted) and not len(sub_ml_formatted) == 0:
             self.ml_formatted = True
+        if all(documented) and not len(documented) == 0:
+            self.documented = True
 
     def report(self, df, columns):
         data = []
@@ -194,7 +197,7 @@ class Parser(object):
             data.append(self.ml_formatted)
             col.append("formatted multiline")
         if "Documented" in columns:
-            data.append(self.ml_complete)
+            data.append(self.documented)
             col.append("Documented")
         datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
@@ -211,7 +214,7 @@ class Parser(object):
         return ret
 
 
-class _Bracket(Parser):
+class _Bracket(_Parser):
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"\(")
@@ -233,7 +236,7 @@ class _Bracket(Parser):
         return df
 
 
-class _StraightBracket(Parser):
+class _StraightBracket(_Parser):
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"\[")
@@ -254,7 +257,7 @@ class _StraightBracket(Parser):
         return df
 
 
-class _CurvedBracket(Parser):
+class _CurvedBracket(_Parser):
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"{")
@@ -275,7 +278,7 @@ class _CurvedBracket(Parser):
         return df
 
 
-class _SingleString(Parser):
+class _SingleString(_Parser):
 
     before = re.compile(r"[^\\'f]")
     current = re.compile(r"'")
@@ -298,7 +301,7 @@ class _SingleString(Parser):
         return df
 
 
-class _DoubleString(Parser):
+class _DoubleString(_Parser):
 
     before = re.compile(r"[^\\\"f]")
     current = re.compile(r"\"")
@@ -321,7 +324,7 @@ class _DoubleString(Parser):
         return df
 
 
-class _FormattingSingleString(Parser):
+class _FormattingSingleString(_Parser):
 
     before = re.compile(r"f")
     current = re.compile(r"'")
@@ -344,7 +347,7 @@ class _FormattingSingleString(Parser):
         return df
 
 
-class _FormattingDoubleString(Parser):
+class _FormattingDoubleString(_Parser):
 
     before = re.compile(r"f")
     current = re.compile(r"\"")
@@ -367,7 +370,7 @@ class _FormattingDoubleString(Parser):
         return df
 
 
-class _SingleMultilineString(Parser):
+class _SingleMultilineString(_Parser):
 
     before = re.compile(r"[^\\]")
     current = re.compile(r"'")
@@ -387,16 +390,51 @@ class _SingleMultilineString(Parser):
 
     def check(self):
         if isinstance(self.parent, _Class):
-            pass
+            regex = self.regex["class"]
         elif isinstance(self.parent, _Function):
-            if self.regex["function"]["main"].match(self.text):
-                self.ml_formatted = True
+            regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
-            if self.regex["method"]["main"].match(self.text):
-                self.ml_formatted = True
+            regex = self.regex["method"]
+
+        if regex["main"].match(self.text):
+            self.ml_formatted = True
+            param = util.get_regex_instances(self.text, regex["parameter main"])
+            for p in param:
+                p = regex["parameter start"].sub("", p)
+                p = regex["parameter end"].sub("", p)
+                if isinstance(self.parent, _Class):
+                    self.parent.found_parameters.append(p)
+                else:
+                    self.parent.found_inputs.append(p)
+            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+
+            ret = util.get_regex_instances(self.text, regex["return main"])
+            for r in ret:
+                r = regex["return start"].sub("", r)
+                r = regex["return end"].sub("", r)
+                if r == "":
+                    self.parent.found_returns += 1
+
+            rai = util.get_regex_instances(self.text, regex["raise main"])
+            for r in rai:
+                r = regex["raise start"].sub("", r)
+                r = regex["raise end"].sub("", r)
+                self.parent.found_raises.append(r)
+            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+
+            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+                    len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                self.parent.documented = True
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
 
 
-class _DoubleMultilineString(Parser):
+class _DoubleMultilineString(_Parser):
 
     before = re.compile(r"[^\\]")
     current = re.compile(r"\"")
@@ -416,16 +454,51 @@ class _DoubleMultilineString(Parser):
 
     def check(self):
         if isinstance(self.parent, _Class):
-            pass
+            regex = self.regex["class"]
         elif isinstance(self.parent, _Function):
-            if self.regex["function"]["main"].match(self.text):
-                self.ml_formatted = True
+            regex = self.regex["function"]
         elif isinstance(self.parent, _Method):
-            if self.regex["method"]["main"].match(self.text):
-                self.ml_formatted = True
+            regex = self.regex["method"]
+
+        if regex["main"].match(self.text):
+            self.ml_formatted = True
+            param = util.get_regex_instances(self.text, regex["parameter main"])
+            for p in param:
+                p = regex["parameter start"].sub("", p)
+                p = regex["parameter end"].sub("", p)
+                if isinstance(self.parent, _Class):
+                    self.parent.found_parameters.append(p)
+                else:
+                    self.parent.found_inputs.append(p)
+            self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
+            self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
+
+            ret = util.get_regex_instances(self.text, regex["return main"])
+            for r in ret:
+                r = regex["return start"].sub("", r)
+                r = regex["return end"].sub("", r)
+                if r == "":
+                    self.parent.found_returns += 1
+
+            rai = util.get_regex_instances(self.text, regex["raise main"])
+            for r in rai:
+                r = regex["raise start"].sub("", r)
+                r = regex["raise end"].sub("", r)
+                self.parent.found_raises.append(r)
+            self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
+
+            if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
+               len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0:
+                self.parent.documented = True
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
 
 
-class _Comment(Parser):
+class _Comment(_Parser):
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"#")
@@ -449,7 +522,7 @@ class _Comment(Parser):
         return df
 
 
-class _Function(Parser):
+class _Function(_Parser):
 
     before = re.compile(r"[\n ]")
     current = re.compile(r"d")
@@ -487,7 +560,7 @@ class _Function(Parser):
         return ret
 
 
-class _Method(Parser):
+class _Method(_Parser):
 
     before = re.compile(r"[\n ]")
     current = re.compile(r"d")
@@ -528,7 +601,7 @@ class _Method(Parser):
         return ret
 
 
-class _Class(Parser):
+class _Class(_Parser):
 
     before = re.compile(r"[\n ]")
     current = re.compile(r"c")
@@ -557,7 +630,7 @@ class _Class(Parser):
         return []
 
 
-class _Parameter(Parser):
+class _Parameter(_Parser):
 
     before = re.compile(r"\W")
     current = re.compile(r"s")
@@ -587,7 +660,7 @@ class _Parameter(Parser):
         return [self.name]
 
 
-class _Return(Parser):
+class _Return(_Parser):
 
     before = re.compile(r"\W")
     current = re.compile(r"r")
@@ -608,7 +681,7 @@ class _Return(Parser):
         return df
 
 
-class _Raise(Parser):
+class _Raise(_Parser):
 
     before = re.compile(r"\W")
     current = re.compile(r"r")
@@ -633,7 +706,7 @@ class _Raise(Parser):
         return df
 
 
-class _Property(Parser):
+class _Property(_Parser):
 
     before = re.compile(r"\W")
     current = re.compile(r"@")
@@ -669,7 +742,7 @@ class _Property(Parser):
         return ret
 
 
-class _ClassParameter(Parser):
+class _ClassParameter(_Parser):
 
     before = re.compile(r"\W")
     current = re.compile(r"\w")
