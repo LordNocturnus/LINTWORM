@@ -34,12 +34,19 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                     paths.append(os.path.join(p, name))
 
     for p in paths:
-        text = util.replace_tabs(open(p, "r").read())
-        code = parser._Parser(text, p, regex)
+        try:
+            text = open(p, "r").read()
+            if "\t" in text:
+                text = util.replace_tabs(text)
 
-        code.parse()
-        code.parameter_check()
-        code.check()
+            code = parser._Parser(text, p, regex)
+
+            code.parse()
+            code.parameter_check()
+            code.check()
+
+        except UnicodeDecodeError:
+            code = parser._Parser("", p, regex)
 
         try:
             df = pd.read_csv(report_path)
