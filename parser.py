@@ -59,6 +59,10 @@ class _Parser(object):
         return ""
 
     @property
+    def ret_offset(self):
+        return self.offset
+
+    @property
     def pure_text(self):
         text = self.text
         for s in self.subcontent:
@@ -89,7 +93,7 @@ class _Parser(object):
             elif self.endchar.match(self.text[c:]):
                 self.text = self.text[:c+self.offset]
                 self.end = self.start + len(self.text)
-                return c + self.offset
+                return c + self.ret_offset
             elif self.text[c] == "\n":
                 c += 1
                 current_indent = 0
@@ -270,6 +274,10 @@ class _CurvedBracket(_Parser):
         self.offset = 1
 
         self.defstr = "curved bracket"
+
+    @property
+    def ret_offset(self):
+        return 0
 
     def report(self, df, columns):
         for sub in self.subcontent:
