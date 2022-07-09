@@ -512,8 +512,8 @@ class _Comment(_Parser):
     current = re.compile(r"#")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, parent=None, indent=0):
-        super().__init__(text, parent, indent)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]\n')
         self.offset = 2
@@ -611,7 +611,7 @@ class _Method(_Parser):
 
 class _Class(_Parser):
 
-    before = re.compile(r"[\n ]")
+    before = re.compile(r"\s")
     current = re.compile(r"c")
     after = re.compile(r"lass ")
 
