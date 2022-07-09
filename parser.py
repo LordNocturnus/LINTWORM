@@ -127,11 +127,12 @@ class _Parser(object):
                 sub_ml_comment.append(s.ml_comment)
                 sub_ml_formatted.append(s.ml_formatted)
                 documented.append(s.documented)
-        if all(sub_ml_comment) and (not len(sub_ml_comment) == 0 or type(self) == _Parser):
+        if all(sub_ml_comment) and not len(sub_ml_comment) == 0 and not isinstance(self, (_Class, _Function, _Method)):
             self.ml_comment = True
-        if all(sub_ml_formatted) and (not len(sub_ml_formatted) == 0 or type(self) == _Parser):
+        if all(sub_ml_formatted) and not len(sub_ml_formatted) == 0 and not isinstance(self, (_Class, _Function,
+                                                                                              _Method)):
             self.ml_formatted = True
-        if all(documented) and (not len(documented) == 0 or type(self) == _Parser):
+        if all(documented) and not len(documented) == 0 and not isinstance(self, (_Class, _Function, _Method)):
             self.documented = True
 
     def report(self, df, columns):
