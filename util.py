@@ -83,3 +83,21 @@ standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[
                         "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                         "raise start": r"[ ]*:raise:[ ]+",
                         "raise end": r"[ ]*\n"}
+
+standard_columns = ["path",
+                    "name",
+                    "type",
+                    # "start char",
+                    # "end char",
+                    # "inputs",
+                    # "found inputs",
+                    "missing inputs",
+                    "returns",
+                    "found returns",
+                    # "raises",
+                    # "found raises",
+                    "missing raises",
+                    # "parameters",
+                    # "found parameters",
+                    "missing parameters",
+                    ]

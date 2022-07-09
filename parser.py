@@ -143,12 +143,12 @@ class _Parser(object):
             data.append(self.defstr)
             col.append("type")
 
-        if "start line" in columns:
+        if "start char" in columns:
             data.append(self.start + 1)
-            col.append("start line")
-        if "end line" in columns:
+            col.append("start char")
+        if "end char" in columns:
             data.append(self.end + 1)
-            col.append("end line")
+            col.append("end char")
 
         if "inputs" in columns:
             data.append(":".join(self.inputs))
