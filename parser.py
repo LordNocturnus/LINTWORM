@@ -303,9 +303,9 @@ class _SingleString(_Parser):
 
 class _DoubleString(_Parser):
 
-    before = re.compile(r"[^\\\"f]")
-    current = re.compile(r"\"")
-    after = re.compile(r"[^\"]|([^\"]{2})")
+    before = re.compile(r'[^\\"f]')
+    current = re.compile(r'"')
+    after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
@@ -350,8 +350,8 @@ class _FormattingSingleString(_Parser):
 class _FormattingDoubleString(_Parser):
 
     before = re.compile(r"f")
-    current = re.compile(r"\"")
-    after = re.compile(r"[^\"]|([^\"]{2})")
+    current = re.compile(r'"')
+    after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
@@ -437,8 +437,8 @@ class _SingleMultilineString(_Parser):
 class _DoubleMultilineString(_Parser):
 
     before = re.compile(r"[^\\]")
-    current = re.compile(r"\"")
-    after = re.compile(r"\"\"")
+    current = re.compile(r'"')
+    after = re.compile(r'""')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
