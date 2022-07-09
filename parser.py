@@ -35,7 +35,8 @@ class _Parser(object):
                                    _Parameter,
                                    _Return,
                                    _Raise,
-                                   _Property]
+                                   _Property,
+                                   _Argument]
 
         self.basic_comments = False
         self.ml_comment = False
@@ -785,3 +786,28 @@ class _ClassParameter(_Parser):
 
     def parameter_check(self):
         return [self.name]
+
+
+class _Argument(_Parser):
+
+    before = re.compile(r"[\W\w]")
+    current = re.compile(r"\n")
+    after = re.compile(r"[ ]*@[^\Wp]")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(f'\n')
+        self.offset = 0
+
+        self.defstr = "argument"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
+
+    @property
+    def name(self):
+        return self.text[1:]
