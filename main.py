@@ -1,79 +1,15 @@
-from datetime import datetime
 import pandas as pd
-import os
-import re
-import copy
 
-from code_pieces import Code
 import parser
+import util
 
 
-def simple_start(path, report_path=None, classregex=parser.standard_classregex, functionregex=parser.standard_functionregex,
-                 methodregex=parser.standard_methodregex, columns=tuple()):
-    if report_path:
-        report_path = report_path + "/LintwormReport_" + datetime.now().strftime("%H_%M_%S") + ".csv"
+def lintworm(path, reportpath, reportname=None, classregex=util.standard_classregex, functionregex=util.standard_functionregex,
+             methodregex=util.standard_methodregex):
 
-    classregex = copy.deepcopy(classregex)
-    functionregex = copy.deepcopy(functionregex)
-    methodregex = copy.deepcopy(methodregex)
-
-    classregex["parameter_line"] = re.compile(classregex["parameter_start"] + r"[\w]+" +
-                                              classregex["parameter_end"])
-    classregex["parameter_start"] = re.compile(classregex["parameter_start"])
-    classregex["parameter_end"] = re.compile(classregex["parameter_end"])
-
-    functionregex["main"] = re.compile(functionregex["main"])
-    functionregex["parameter_line"] = re.compile(functionregex["parameter_start"] + r"[\w]+" +
-                                                 functionregex["parameter_end"])
-    functionregex["parameter_start"] = re.compile(functionregex["parameter_start"])
-    functionregex["parameter_end"] = re.compile(functionregex["parameter_end"])
-    functionregex["return_line"] = re.compile(functionregex["return_start"] + functionregex["return_end"])
-    functionregex["return_start"] = re.compile(functionregex["return_start"])
-    functionregex["return_end"] = re.compile(functionregex["return_end"])
-    functionregex["raise_line"] = re.compile(functionregex["raise_start"] + r"[\w.]+" +
-                                             functionregex["raise_end"])
-    functionregex["raise_start"] = re.compile(functionregex["raise_start"])
-    functionregex["raise_end"] = re.compile(functionregex["raise_end"])
-
-    methodregex["main"] = re.compile(methodregex["main"])
-    methodregex["parameter_line"] = re.compile(methodregex["parameter_start"] + r"[\w]+" +
-                                               methodregex["parameter_end"])
-    methodregex["parameter_start"] = re.compile(methodregex["parameter_start"])
-    methodregex["parameter_end"] = re.compile(methodregex["parameter_end"])
-    methodregex["return_line"] = re.compile(methodregex["return_start"] + methodregex["return_end"])
-    methodregex["return_start"] = re.compile(methodregex["return_start"])
-    methodregex["return_end"] = re.compile(methodregex["return_end"])
-    methodregex["raise_line"] = re.compile(methodregex["raise_start"] + r"[\w.]+" +
-                                           methodregex["raise_end"])
-    methodregex["raise_start"] = re.compile(methodregex["raise_start"])
-    methodregex["raise_end"] = re.compile(methodregex["raise_end"])
-
-    paths = []
-    for path, subdirs, files in os.walk(path):
-        for name in files:
-            if name[-3:] == ".py":
-                paths.append(os.path.join(path, name))
-
-    for p in paths:
-        f = open(p, "r").readlines()
-        lines = []
-        for line in f:
-            if "\t" in line:
-                line = parser.replace_tabs(line)
-            lines.append([len(line) - len(line.lstrip(' ')), line])
-
-        code = Code("__main__", -1, p, classregex=classregex, functionregex=functionregex, methodregex=methodregex)
-        code.parse(0, lines)
-        code.check()
-        if report_path:
-            try:
-                df = pd.read_csv(report_path)
-            except OSError:
-                df = pd.DataFrame([], columns=columns)
-            df = code.report(df, columns)
-            df.to_csv(report_path, index=False)
-        print(f"finished file {p}")
-
+    regex = {"class": util.process_regex(classregex),
+             "function": util.process_regex(functionregex),
+             "method": util.process_regex(methodregex)}
 
 if __name__ == "__main__":
     columns = ["path",
@@ -81,19 +17,44 @@ if __name__ == "__main__":
                "type",
                "start line",
                "end line",
-               #"inputs",
-               #"found inputs",
+               # "inputs",
+               # "found inputs",
                "missing inputs",
                "returns",
                "found returns",
-               #"raises",
-               #"found raises",
+               # "raises",
+               # "found raises",
                "missing raises",
-               "parameters",
-               "found parameters"
+               # "parameters",
+               # "found parameters",
+               "missing parameters",
                "basic comments",
                "multiline comments",
                "formatted multiline",
                "Documented"]
-    simple_start(path="G:/pythonprojects/NEST/WIZARD", report_path="G:/pythonprojects/NEST/LINTWORM", columns=columns)
-    print("finished")
+
+    regex = {"class": util.process_regex(util.standard_classregex),
+             "function": util.process_regex(util.standard_functionregex),
+             "method": util.process_regex(util.standard_methodregex)}
+
+    df = pd.DataFrame([], columns=columns)
+    text = util.replace_tabs(open("G:/pythonprojects/NEST/LINTWORM/parser.py", "r").read())
+    test1 = parser._Parser(text, "G:/pythonprojects/NEST/LINTWORM/parser.py", regex)
+    test1.parse()
+    test1.parameter_check()
+    test1.check()
+    df = test1.report(df, columns)
+    df.to_csv("G:/pythonprojects/NEST/LINTWORM/Report_1.csv", index=False)
+
+    print("finished 1")
+
+    df = pd.DataFrame([], columns=columns)
+    text = util.replace_tabs(open("G:/pythonprojects/NEST/WIZARD/git/commands.py", "r").read())
+    test2 = parser._Parser(text, "G:/pythonprojects/NEST/WIZARD/git/commands.py", regex)
+    test2.parse()
+    test2.parameter_check()
+    test2.check()
+    df = test2.report(df, columns)
+    df.to_csv("G:/pythonprojects/NEST/LINTWORM/Report_2.csv", index=False)
+
+    print("finished 2")
