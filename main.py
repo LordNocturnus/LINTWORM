@@ -48,7 +48,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             valid = True
             text = open(p, "r").read()
             if hash_path:
-                hashed, in_df, text_hash = util.check_hash(text, hash_df, p)
+                hashed, in_df, text_hash = util.check_hash(text, hash_df, p, level)
         except UnicodeDecodeError:
             valid = False
 
@@ -97,4 +97,4 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/test", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
+    test = lintworm("G:/pythonprojects/NEST/WIZARD", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")

@@ -66,11 +66,12 @@ def get_regex_instances(text, regex):
     return ret
 
 
-def check_hash(text, df, path):
+def check_hash(text, df, path, level="documented"):
     text_hash = hashlib.sha256(text.encode()).hexdigest()
     if path in np.asarray(df["path"]):
         if np.asarray(df["hash"][df["path"] == path])[0] == text_hash:
-            return True, True, text_hash
+            if np.asarray(df[level][df["path"] == path])[0]:
+                return True, True, text_hash
         return False, True, text_hash
     return False, False, text_hash
 
