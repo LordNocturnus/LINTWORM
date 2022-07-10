@@ -54,10 +54,10 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
         if valid and hashed:
             code = parser._Parser("", p, regex)
-            code.basic_comments = hash_df["basic comments"][hash_df["path"] == p]
-            code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p]
-            code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p]
-            code.documented = hash_df["documented"][hash_df["path"] == p]
+            code.basic_comments = hash_df["basic comments"][hash_df["path"] == p].iloc[0]
+            code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p].iloc[0]
+            code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p].iloc[0]
+            code.documented = hash_df["documented"][hash_df["path"] == p].iloc[0]
         elif valid:
             if "\t" in text:
                 text = util.replace_tabs(text)
