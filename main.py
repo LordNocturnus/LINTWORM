@@ -8,7 +8,7 @@ import util
 
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
-             columns=util.standard_columns, hash_path=None):
+             columns=util.standard_columns, hash_path=None, level="documented"):
 
     regex = {"class": util.process_regex(classregex),
              "function": util.process_regex(functionregex),
@@ -30,7 +30,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             hash_df = pd.read_csv(hash_path)
         except OSError:
             hash_df = pd.DataFrame([], columns=["path", "basic comments", "multiline comments", "formatted multiline",
-                                                "Documented", "hash"])
+                                                "documented", "hash"])
 
     paths = []
     if os.path.isfile(path):
@@ -57,7 +57,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             code.basic_comments = hash_df["basic comments"][hash_df["path"] == p]
             code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p]
             code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p]
-            code.documented = hash_df["Documented"][hash_df["path"] == p]
+            code.documented = hash_df["documented"][hash_df["path"] == p]
         elif valid:
             if "\t" in text:
                 text = util.replace_tabs(text)
@@ -76,13 +76,13 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                 print("hashing", p)
                 new_hash = pd.DataFrame([[p, code.basic_comments, code.ml_comment, code.ml_formatted, code.documented,
                                           text_hash]], columns=["path", "basic comments", "multiline comments",
-                                                                "formatted multiline", "Documented", "hash"])
+                                                                "formatted multiline", "documented", "hash"])
                 hash_df = pd.concat([hash_df, new_hash], ignore_index=True)
             else:
                 hash_df["basic comments"][hash_df["path"] == p].loc[0] = code.basic_comments
                 hash_df["multiline comments"][hash_df["path"] == p].loc[0] = code.ml_comment
                 hash_df["formatted multiline"][hash_df["path"] == p].loc[0] = code.ml_formatted
-                hash_df["Documented"][hash_df["path"] == p].loc[0] = code.documented
+                hash_df["documented"][hash_df["path"] == p].loc[0] = code.documented
                 hash_df["hash"][hash_df["path"] == p].loc[0] = text_hash
 
         try:
