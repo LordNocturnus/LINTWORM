@@ -228,9 +228,9 @@ class _Parser(object):
         if "formatted multiline" in columns:
             data.append(self.ml_formatted)
             col.append("formatted multiline")
-        if "Documented" in columns:
+        if "documented" in columns:
             data.append(self.documented)
-            col.append("Documented")
+            col.append("documented")
         datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
 

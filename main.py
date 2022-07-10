@@ -21,7 +21,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     columns.append("basic comments")
     columns.append("multiline comments")
     columns.append("formatted multiline")
-    columns.append("Documented")
+    columns.append("documented")
 
     paths = []
     if os.path.isfile(path):
