@@ -97,4 +97,4 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/WIZARD", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
+    test = lintworm("G:/pythonprojects/NEST/LINTWORM", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
