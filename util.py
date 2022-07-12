@@ -1,4 +1,14 @@
 import re
+import fnmatch
+
+
+class PathFilter(object):
+
+    def __init__(self, wants, ignores):
+        self.wants = wants
+        self.ignores = ignores
+        self.files = []
+        self.folders = []
 
 
 def replace_tabs(string):
