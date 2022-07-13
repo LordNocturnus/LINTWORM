@@ -81,11 +81,12 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                                                                                  "hash"])
                 hash_df = pd.concat([hash_df, new_hash], ignore_index=True)
             else:
-                hash_df["basic comments"][hash_df["path"] == p].loc[0] = code.basic_comments
-                hash_df["multiline comments"][hash_df["path"] == p].loc[0] = code.ml_comment
-                hash_df["formatted multiline"][hash_df["path"] == p].loc[0] = code.ml_formatted
-                hash_df["documented"][hash_df["path"] == p].loc[0] = code.documented
-                hash_df["hash"][hash_df["path"] == p].loc[0] = text_hash
+                index = hash_df["basic comments"][hash_df["path"] == p].index[0]
+                hash_df.at[index, "basic comments"] = code.basic_comments
+                hash_df.at[index, "multiline comments"] = code.ml_comment
+                hash_df.at[index, "formatted multiline"] = code.ml_formatted
+                hash_df.at[index, "documented"] = code.documented
+                hash_df.at[index, "hash"] = text_hash
 
         try:
             df = pd.concat([pd.read_csv(report_path), df], ignore_index=True)
