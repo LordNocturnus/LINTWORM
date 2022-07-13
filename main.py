@@ -29,18 +29,18 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         try:
             hash_df = pd.read_csv(hash_path)
         except OSError:
-            hash_df = pd.DataFrame([], columns=["path", "basic comments", "multiline comments", "formatted multiline",
-                                                "documented", "hash"])
+            hash_df = pd.DataFrame([], columns=["path", "hashed", "basic comments", "multiline comments",
+                                                "formatted multiline", "documented", "hash"])
 
     paths = []
     if os.path.isfile(path):
         if path[-3:] == ".py":
-            paths.append(path)
+            paths.append(os.path.normpath(path))
     else:
         for p, subdirs, files in os.walk(path):
             for name in files:
                 if name[-3:] == ".py":
-                    paths.append(os.path.join(p, name))
+                    paths.append(os.path.normpath(os.path.join(p, name)))
 
     for p in paths:
         hashed = False
@@ -74,9 +74,11 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         if hash_path:
             if not in_df:
                 print("hashing", p)
-                new_hash = pd.DataFrame([[p, code.basic_comments, code.ml_comment, code.ml_formatted, code.documented,
-                                          text_hash]], columns=["path", "basic comments", "multiline comments",
-                                                                "formatted multiline", "documented", "hash"])
+                new_hash = pd.DataFrame([[p, True, code.basic_comments, code.ml_comment, code.ml_formatted,
+                                          code.documented, text_hash]], columns=["path", "hashed", "basic comments",
+                                                                                 "multiline comments",
+                                                                                 "formatted multiline", "documented",
+                                                                                 "hash"])
                 hash_df = pd.concat([hash_df, new_hash], ignore_index=True)
             else:
                 hash_df["basic comments"][hash_df["path"] == p].loc[0] = code.basic_comments
@@ -96,5 +98,32 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     return df
 
 
+def check_integrity(path, hash_path):
+
+    hash_df = pd.read_csv(hash_path)
+
+    paths = []
+    if os.path.isfile(path):
+        if path[-3:] == ".py":
+            paths.append(os.path.normpath(path))
+    else:
+        for p, subdirs, files in os.walk(path):
+            for name in files:
+                if name[-3:] == ".py":
+                    paths.append(os.path.normpath(os.path.join(p, name)))
+
+    for p in paths:
+        try:
+            text = open(p, "r").read()
+            valid, _, _ = util.check_hash(text, hash_df, p, "hashed")
+        except UnicodeDecodeError:
+            valid = False
+        if not valid:
+            return False, p
+
+    return True, ""
+
+
 if __name__ == "__main__":
     test = lintworm("G:/pythonprojects/NEST/LINTWORM", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
+    temp = check_integrity("G:/pythonprojects/NEST/LINTWORM/parser.py", "G:/pythonprojects/NEST/LINTWORM/hash.csv")
