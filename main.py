@@ -100,6 +100,16 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
 
 def check_integrity(path, hash_path):
+    """
+        checks if any python files in path have changed compared to when the hash file was last run over the files in
+        path
+
+    :param path:        {Pathlike}  path in which to check all python files in
+    :param hash_path:   {Pathlike}  path to a lintworm created hash file which is used to compare hashes
+
+    :return:            {Bool, str} found a file with a changed hash, path to edited file
+    :return:            {Bool, str} all files have the same hash values as in the hash file
+    """
 
     hash_df = pd.read_csv(hash_path)
 
