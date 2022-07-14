@@ -1,4 +1,6 @@
+import numpy as np
 import re
+import hashlib
 
 
 def replace_tabs(string):
@@ -6,10 +8,9 @@ def replace_tabs(string):
         This function replaces all tabs in a string with the number of spaces that result in a string with the same
         indentation and length
 
-        :param
-            string {str}    -- string potentially containing tabs to be replaced with spaces
-        :return
-            {str}           -- string with all tabs replaced by spaces
+    :param string:  {str}   string potentially containing tabs to be replaced with spaces
+
+    :return:        {str}   string with all tabs replaced by spaces
     """
     new_lines = []
     for line in string.split("\n"):
@@ -21,6 +22,34 @@ def replace_tabs(string):
 
 
 def process_regex(regex):
+    """
+        compiles the strings in the regex dict into regex instances and adds the parameter main, return main, yield main
+        and raise main
+
+    :param regex:   {dict}  dictionary containing regex compatible strings which are to be compiled into regex
+                            instances.
+                            Should contain,
+                                main,               string to match a complete multiline string to the given format
+                                parameter start,    beginning of a parameter definition should stop right before the
+                                                    parameter name
+                                parameter end,      end of a parameter definition should start right after the parameter
+                                                    name and not overlap into the next parameter/return/yield/raise
+                                return start,       beginning of a return definition should stop somewhere in the return
+                                                    definition
+                                return end,         end of a return definition should start right after the return start
+                                                    and not overlap into the next parameter/return/yield/raise
+                                yield start,        beginning of a yield definition should stop somewhere in the yield
+                                                    definition
+                                yield end,          end of a yield definition should start right after the yield start
+                                                    and not overlap into the next parameter/return/yield/raise
+                                raise start,        beginning of a raise definition should stop right before the
+                                                    raise type
+                                raise end,          end of a raise definition should start right after the raise
+                                                    type and not overlap into the next parameter/return/yield/raise
+
+    :return:        {dict}  dictionary with all necessary regex instances for a single type of multiline comment that is
+                            to be matched in LINTWORM
+    """
     ret = dict()
 
     ret["main"] = re.compile(regex["main"])
@@ -64,31 +93,63 @@ def get_regex_instances(text, regex):
     return ret
 
 
-standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+def check_hash(text, df, path, level="documented"):
+    """
+        checks if path is in df, if the sha256 has of text in df is identical and if the text passed LINTWORM above
+        level for the given hash.
+
+    :param text:    {str}               text (meaning python code) obtained from file path
+    :param df:      {pandas.Dataframe}  a Dataframe obtained from a LINTWORM generated hash file. Can be an empty
+                                        Dataframe when running LINTWORM for the first time over a new hash file
+    :param path:    {Pathlike}          path to the python file which is being checked for hash
+    :param level:   {str}               documentation level text should at least have for the hash. valid are
+                                        "basic comments", "multiline comments", "multiline formatted" and "documented"
+                                        in increasing order of level
+
+    :return:        {bool, bool, str}   hashes are identical and path is documented to at least level,
+                                        path is in df aka the file has been hashed in the past,
+                                        sha256 hash of text
+    :return:        {bool, bool, str}   hashes are not identical or path is not documented to at least level,
+                                        path is in df aka the file has been hashed in the past,
+                                        sha256 hash of text
+    :return:        {bool, bool, str}   not checked,
+                                        path is not in df aka the file is new,
+                                        sha256 hash of text
+    """
+    text_hash = hashlib.sha256(text.encode()).hexdigest()
+    if path in np.asarray(df["path"]):
+        if np.asarray(df["hash"][df["path"] == path])[0] == text_hash:
+            if np.asarray(df[level][df["path"] == path])[0]:
+                return True, True, text_hash
+        return False, True, text_hash
+    return False, False, text_hash
+
+
+standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                        "parameter start": r"[ ]*:param ",
                        "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                        "return start": r"[ ]*:return:",
-                       "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                       "return end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                        "yield start": r"[ ]*:return:",
                        "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                        "raise start": r"[ ]*:raise:[ ]+",
                        "raise end": r"[\s]*\n"}
 
-standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                           "parameter start": r"[ ]*:param ",
                           "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                           "return start": r"[ ]*:return:",
-                          "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                          "return end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                           "yield start": r"[ ]*:yield:",
                           "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                           "raise start": r"[ ]*:raise:[ ]+",
                           "raise end": r"[\s]*\n"}
 
-standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                         "parameter start": r"[ ]*:param ",
                         "parameter end": r":[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                         "return start": r"[ ]*:return:",
-                        "return end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
+                        "return end": r"[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
                         "yield start": r"[ ]*:yield:",
                         "yield end": r"[ ]+{[\w.]+}([ ]+[^:\n]+\n)+",
                         "raise start": r"[ ]*:raise:[ ]+",
