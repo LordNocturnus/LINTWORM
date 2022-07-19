@@ -239,4 +239,8 @@ standard_columns = ["path",
                     # "parameters",
                     # "found parameters",
                     "missing parameters",
+                    "basic comments",
+                    "multiline comments",
+                    "formatted multiline",
+                    "documented",
                     ]

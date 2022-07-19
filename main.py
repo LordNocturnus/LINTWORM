@@ -18,10 +18,14 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         report_name = "LintwormReport_" + datetime.now().strftime("%H_%M_%S") + ".csv"
 
     report_path = str(os.path.join(os.path.abspath(report_path), os.path.normpath(report_name)))
-    columns.append("basic comments")
-    columns.append("multiline comments")
-    columns.append("formatted multiline")
-    columns.append("documented")
+    if "basic comments" not in columns:
+        columns.append("basic comments")
+    if "multiline comments" not in columns:
+        columns.append("multiline comments")
+    if "formatted multiline" not in columns:
+        columns.append("formatted multiline")
+    if "documented" not in columns:
+        columns.append("documented")
 
     df = pd.DataFrame([], columns=columns)
 
@@ -101,7 +105,8 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         df.to_csv(report_path, index=False)
 
         print("finished:", p.path)
-    hash_df.to_csv(hash_path, index=False)
+    if hash_path:
+        hash_df.to_csv(hash_path, index=False)
     return df
 
 
@@ -142,7 +147,7 @@ def check_integrity(path, hash_path):
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/LINTWORM", filter=["*\\parser.py", "*\\.git", "*\\.idea"])
+    test = lintworm("G:/pythonprojects/NEST/LINTWORM", filter=["*\\parser.py", "*\\.git", "*\\.idea"],
+                    hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
 
-    test2 = lintworm("G:/pythonprojects/NEST/LINTWORM", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
     temp = check_integrity("G:/pythonprojects/NEST/LINTWORM/parser.py", "G:/pythonprojects/NEST/LINTWORM/hash.csv")
