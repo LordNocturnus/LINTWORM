@@ -1,14 +1,70 @@
 import re
+import os
 import fnmatch
 
 
 class PathFilter(object):
 
-    def __init__(self, wants, ignores):
-        self.wants = wants
-        self.ignores = ignores
-        self.files = []
+    def __init__(self, patterns):
+        """
+            initialize teh PathFileter class
+
+        :param patterns:    {List}  List containing glob compatible patterns that are used for path filtering
+        """
+        self.patterns = patterns
         self.folders = []
+        self.files = []
+
+    @classmethod
+    def from_file(cls, path):
+        """
+            load all patterns from a file that follows the glob formatting for filters and uses "#" for comments
+
+        :param path:    {PathLike}      path to the file to load
+
+        :return:        {PathFilter}    new instance of the PathFilter class using all patterns found path
+        """
+        f = open(path, "r").readlines()
+        patterns = []
+        for line in f:
+            line = line[:-1]
+            line = line.split("#")[0]
+            if re.search(r"\W", line):
+                print(line)
+                patterns.append(line)
+        return cls(patterns)
+
+    def match(self, path):
+        """
+            checks if the given path matches any of the patterns of the filter
+
+        :param path:    {PathLike}  path to check for matches with filters
+
+        :return:        {bool}      path matches a pattern of this filter
+        :return:        {bool}      path does not match any of the patterns
+        """
+        for p in self.patterns:
+            if fnmatch.fnmatch(path, p):
+                return True
+        return False
+
+    def walk_dir(self, path):
+        """
+            recursively walks through the dir and all sub dirs that do not match any of the patterns of this filter
+            adding all folders to the folder parameter is done to prevent infinite depth recursion on circular symlinks
+
+        :param path:    {PathLike}  path to walk through
+
+        :return:        {list}      list of paths to all files that do not match any patterns
+        """
+        for sub_path in os.scandir(os.path.normpath(path)):
+            if not self.match(sub_path):
+                if sub_path.is_dir() and sub_path not in self.folders:
+                    self.folders.append(sub_path)
+                    self.walk_dir(sub_path)
+                elif not sub_path.is_dir():
+                    self.files.append(sub_path)
+        return self.files
 
 
 def replace_tabs(string):
@@ -16,10 +72,9 @@ def replace_tabs(string):
         This function replaces all tabs in a string with the number of spaces that result in a string with the same
         indentation and length
 
-        :param
-            string {str}    -- string potentially containing tabs to be replaced with spaces
-        :return
-            {str}           -- string with all tabs replaced by spaces
+    :param string:  {str}   string potentially containing tabs to be replaced with spaces
+
+    :return:        {str}   string with all tabs replaced by spaces
     """
     new_lines = []
     for line in string.split("\n"):

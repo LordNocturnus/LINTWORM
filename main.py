@@ -8,7 +8,7 @@ import util
 
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
-             columns=util.standard_columns):
+             columns=util.standard_columns, filter=None):
 
     regex = {"class": util.process_regex(classregex),
              "function": util.process_regex(functionregex),
@@ -23,30 +23,36 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     columns.append("formatted multiline")
     columns.append("Documented")
 
+    if isinstance(filter, os.PathLike) or type(filter) == str:
+        filter = util.PathFilter.from_file(filter)
+    elif type(filter) == list or type(filter) == tuple:
+        filter = util.PathFilter(filter)
+    else:
+        filter = util.PathFilter([])
+
     paths = []
     if os.path.isfile(path):
-        if path[-3:] == ".py":
+        if path[-3:] == ".py" and not filter.match(path):
             paths.append(path)
     else:
-        for p, subdirs, files in os.walk(path):
-            for name in files:
-                if name[-3:] == ".py":
-                    paths.append(os.path.join(p, name))
+        paths = filter.walk_dir(path)
 
     for p in paths:
+        if not p.name[-3:] == ".py":
+            continue
         try:
-            text = open(p, "r").read()
+            text = open(p.path, "r").read()
             if "\t" in text:
                 text = util.replace_tabs(text)
 
-            code = parser._Parser(text, p, regex)
+            code = parser._Parser(text, p.path, regex)
 
             code.parse()
             code.parameter_check()
             code.check()
 
         except UnicodeDecodeError:
-            code = parser._Parser("", p, regex)
+            code = parser._Parser("", p.path, regex)
 
         try:
             df = pd.read_csv(report_path)
@@ -56,7 +62,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         df = code.report(df, columns)
         df.to_csv(report_path, index=False)
 
-        print("finished:", p)
+        print("finished:", p.path)
 
     try:
         return pd.read_csv(report_path)
@@ -65,4 +71,4 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/test")
+    test = lintworm("G:/pythonprojects/NEST/LINTWORM", filter=["*\\parser.py", "*\\.git", "*\\.idea"])
