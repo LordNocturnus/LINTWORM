@@ -7,6 +7,17 @@ import util
 class _Parser(object):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Parser class by adding all necessary parameters
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
         self.text = text
         self.path = path
         self.regex = regex
@@ -217,9 +228,9 @@ class _Parser(object):
         if "formatted multiline" in columns:
             data.append(self.ml_formatted)
             col.append("formatted multiline")
-        if "Documented" in columns:
+        if "documented" in columns:
             data.append(self.documented)
-            col.append("Documented")
+            col.append("documented")
         datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
 
