@@ -7,6 +7,15 @@ import pathlib
 
 
 class PathFilter(object):
+    """
+        Class used for filterd recursive walks through directories to collect and return all files that have a path that
+        does not match any of the patterns given to the class instance
+
+    :param patterns:    {list}  contains the file patterns that are to be used for filtering paths
+    :param folders:     {list}  contains the absolute paths of all folders visited by the recursive walk_dir method to
+                                prevent infinite recursion in case of circular symlinks
+    :param files:       {list}  all files that do not match any patterns given to the PathFilter instance
+    """
 
     def __init__(self, patterns):
         """
