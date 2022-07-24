@@ -177,13 +177,13 @@ class _Parser(object):
             col.append("end char")
 
         if "inputs" in columns:
-            data.append(":".join(self.inputs))
+            data.append(":".join(sorted(self.inputs)))
             col.append("inputs")
         if "found inputs" in columns:
-            data.append(":".join(self.found_inputs))
+            data.append(":".join(sorted(self.found_inputs)))
             col.append("found inputs")
         if "missing inputs" in columns:
-            data.append(":".join([i for i in self.inputs if i not in self.found_inputs]))
+            data.append(":".join(sorted([i for i in self.inputs if i not in self.found_inputs])))
             col.append("missing inputs")
 
         if "returns" in columns:
@@ -201,23 +201,23 @@ class _Parser(object):
             col.append("found yields")
 
         if "raises" in columns:
-            data.append(":".join(self.raises))
+            data.append(":".join(sorted(self.raises)))
             col.append("raises")
         if "found raises" in columns:
-            data.append(":".join(self.found_raises))
+            data.append(":".join(sorted(self.found_raises)))
             col.append("found raises")
         if "missing raises" in columns:
-            data.append(":".join([i for i in self.raises if i not in self.found_raises]))
+            data.append(":".join(sorted([i for i in self.raises if i not in self.found_raises])))
             col.append("missing raises")
 
         if "parameters" in columns:
-            data.append(":".join(self.parameters))
+            data.append(":".join(sorted(self.parameters)))
             col.append("parameters")
         if "found parameters" in columns:
-            data.append(":".join(self.found_parameters))
+            data.append(":".join(sorted(self.found_parameters)))
             col.append("found parameters")
         if "missing parameters" in columns:
-            data.append(":".join([i for i in self.parameters if i not in self.found_parameters]))
+            data.append(":".join(sorted([i for i in self.parameters if i not in self.found_parameters])))
             col.append("missing parameters")
 
         if "basic comments" in columns:
