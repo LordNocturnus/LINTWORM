@@ -566,6 +566,10 @@ class _Class(_Parser):
         for s in self.subcontent:
             self.parameters += s.parameter_check()
         self.parameters = list(set(self.parameters))
+        for p in self.parameters:
+            for s in self.subcontent:
+                if p == s.name:
+                    self.parameters.pop(self.parameters.index(p))
         return []
 
 
@@ -692,12 +696,6 @@ class _ClassMethodArgument(_Parser):
             df = sub.report(df, columns)
 
         return df
-
-    def parameter_check(self):
-        ret = []
-        for s in self.subcontent:
-            ret += s.parameter_check()
-        return ret
 
 
 class _ClassParameter(_Parser):
