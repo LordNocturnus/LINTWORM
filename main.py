@@ -10,26 +10,89 @@ import util
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
              columns=util.standard_columns, hash_path=None, level="documented", filter=None):
+    """
+        main function of lintwork. It checks all python files in the given folder for a certain level of documentation
 
+    :param path:            {Pathlike}      path in which lintworm should check all python files
+    :param report_path:     {Pathlike}      path to which to save the lintworm report to
+    :param report_name:     {str}           name of the report file if not given will use LintwormReport_HH_MM_SS.csv
+                                            format
+    :param classregex:      {dict}          dictionary containing strings that are then compiled into regex checks that
+                                            are used for checking documentation of classes. needs to contain strings at
+                                            keys "main", "parameter start", "parameter end", "return start",
+                                            "return end", "raise start", "raise end" "yield start" and "yield end"
+    :param functionregex:   {dict}          dictionary containing strings that are then compiled into regex checks that
+                                            are used for checking documentation of classes. needs to contain strings at
+                                            keys "main", "parameter start", "parameter end", "return start",
+                                            "return end", "raise start", "raise end" "yield start" and "yield end"
+    :param methodregex:     {dict}          dictionary containing strings that are then compiled into regex checks that
+                                            are used for checking documentation of classes. needs to contain strings at
+                                            keys "main", "parameter start", "parameter end", "return start",
+                                            "return end", "raise start", "raise end" "yield start" and "yield end"
+    :param columns:         {list}          contains strings indicating which columns to add to the report. Can contain
+                                            any combination of
+                                            "path"               -> path to the python file in which the entry was found
+                                            "name"               -> name of the entry (class name, function name etc.)
+                                            "type"               -> type of the entry (file, class, function etc.)
+                                            "start char"         -> index of the starting character of the entry
+                                            "end char"           -> index of the last character of the entry
+                                            "inputs"             -> inputs of a function or method
+                                            "found inputs"       -> inputs that where found in the docstring of an entry
+                                            "missing inputs"     -> inputs that are missing in the docstring of an entry
+                                            "returns"            -> number of returns in a function, method or class
+                                            "found returns"      -> number of returns found in the docstring of an entry
+                                            "yields"             -> number of yields in a function method or class
+                                            "found yields"       -> number of yields found in the docstring of an entry
+                                            "raises"             -> all errors the entry can raise
+                                            "found raises"       -> all errors found in the docstring of an entry
+                                            "missing raises"     -> all errors missing in the docstring of an entry
+                                            "parameters"         -> parameters of a class
+                                            "found parameters"   -> parameters found in the docstring of a class
+                                            "missing parameters" -> parameters missing in the docstring of a class
+                                            "basic comments"     -> an entry has any comments
+                                            "multiline comments" -> an entry contains a multiline string
+                                            "formatted multiline"-> an entry has a formatted docstring
+                                            "documented"         -> an entries docstring contains everything necessary
+    :param hash_path:       {Pathlike}      path to save/load a hash file to/from. hashing can decrease runtime by
+                                            checking if a file has been changed since the creation of the hash file and
+                                            only running the parser if file has changed
+    :param level:           {str}           level of documentation below which an unchanged hash is ignored and parser
+                                            is run anyways choice between
+                                            "hashed"                -> parser is only run over files with changed hash
+                                            "basic comments"        -> parser is run over files without comments
+                                            "multiline comments"    -> parser is run over files without docstrings
+                                            "formatted multiline"   -> parser is run over files without formatted
+                                                                       docstrings
+                                            "documented"            -> parser is run over files with incomplete
+                                                                       docstrings
+    :param filter:          {Pathlike,list} list containing strings following the glob format path to a file following
+                                            the .gitignore format
+
+    :return:                {DataFrame}     pandas dataframe identical to the generated lintworm report
+    """
+
+    # process regex
     regex = {"class": util.process_regex(classregex),
              "function": util.process_regex(functionregex),
              "method": util.process_regex(methodregex)}
 
+    # prepare for report
     if not report_name:
         report_name = "LintwormReport_" + datetime.now().strftime("%H_%M_%S") + ".csv"
 
     report_path = str(os.path.join(os.path.abspath(report_path), os.path.normpath(report_name)))
-    if "basic comments" not in columns:
+    if "basic comments" not in columns:  # basic comments column is always in the report
         columns.append("basic comments")
-    if "multiline comments" not in columns:
+    if "multiline comments" not in columns:  # multiline comments column is always in the report
         columns.append("multiline comments")
-    if "formatted multiline" not in columns:
+    if "formatted multiline" not in columns:  # formatted multiline column is always in the report
         columns.append("formatted multiline")
-    if "documented" not in columns:
+    if "documented" not in columns:  # documented column is always in the report
         columns.append("documented")
 
     df = pd.DataFrame([], columns=columns)
 
+    # prepare hashing if a hashpath is given
     if hash_path:
         try:
             hash_df = pd.read_csv(hash_path)
@@ -37,6 +100,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             hash_df = pd.DataFrame([], columns=["path", "hashed", "basic comments", "multiline comments",
                                                 "formatted multiline", "documented", "hash"])
 
+    # prepare a PathFilter class and collect all paths
     if isinstance(filter, os.PathLike) or type(filter) == str:
         filter = util.PathFilter.from_file(filter)
     elif type(filter) == list or type(filter) == tuple:
@@ -51,6 +115,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     else:
         paths = filter.walk_dir(path)
 
+    # itterate through all files and check them if they are a .py file
     for p in paths:
         if not p.name[-3:] == ".py":
             continue
@@ -60,7 +125,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             text = open(p, "r").read()
             if hash_path:
                 hashed, in_df, text_hash = util.check_hash(text, hash_df, p, level)
-        except UnicodeDecodeError:
+        except UnicodeDecodeError:  # someone fucked up
             valid = False
 
         if valid and hashed:
