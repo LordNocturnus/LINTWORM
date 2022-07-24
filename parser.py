@@ -806,7 +806,7 @@ class _Property(_Parser):
     @property
     def name(self):
         for s in self.subcontent:
-            if isinstance(s, (_Method, _Function)):
+            if isinstance(s, _Method):
                 return s.name
 
     def parameter_check(self):

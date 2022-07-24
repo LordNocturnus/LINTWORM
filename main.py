@@ -1,6 +1,7 @@
 from datetime import datetime
 import pandas as pd
 import os
+import pathlib
 
 import parser
 import util
@@ -46,7 +47,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     paths = []
     if os.path.isfile(path):
         if path[-3:] == ".py" and not filter.match(path):
-            paths.append(os.path.normpath(path))
+            paths.append(pathlib.Path(path))
     else:
         paths = filter.walk_dir(path)
 
@@ -56,42 +57,42 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         hashed = False
         try:
             valid = True
-            text = open(p.path, "r").read()
+            text = open(p, "r").read()
             if hash_path:
-                hashed, in_df, text_hash = util.check_hash(text, hash_df, p.path, level)
+                hashed, in_df, text_hash = util.check_hash(text, hash_df, p, level)
         except UnicodeDecodeError:
             valid = False
 
         if valid and hashed:
-            code = parser._Parser("", p.path, regex)
-            code.basic_comments = hash_df["basic comments"][hash_df["path"] == p.path].iloc[0]
-            code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p.path].iloc[0]
-            code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p.path].iloc[0]
-            code.documented = hash_df["documented"][hash_df["path"] == p.path].iloc[0]
+            code = parser._Parser("", p, regex)
+            code.basic_comments = hash_df["basic comments"][hash_df["path"] == p].iloc[0]
+            code.ml_comment = hash_df["multiline comments"][hash_df["path"] == p].iloc[0]
+            code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == p].iloc[0]
+            code.documented = hash_df["documented"][hash_df["path"] == p].iloc[0]
         elif valid:
             if "\t" in text:
                 text = util.replace_tabs(text)
 
-            code = parser._Parser(text, p.path, regex)
+            code = parser._Parser(text, p, regex)
 
             code.parse()
             code.parameter_check()
             code.check()
         else:
-            code = parser._Parser("", p.path, regex)
+            code = parser._Parser("", p, regex)
 
         df = code.report(pd.DataFrame([], columns=columns), columns)
         if hash_path:
             if not in_df:
-                print("hashing", p.path)
-                new_hash = pd.DataFrame([[p.path, True, code.basic_comments, code.ml_comment, code.ml_formatted,
+                print("hashing", p)
+                new_hash = pd.DataFrame([[p, True, code.basic_comments, code.ml_comment, code.ml_formatted,
                                           code.documented, text_hash]], columns=["path", "hashed", "basic comments",
                                                                                  "multiline comments",
                                                                                  "formatted multiline", "documented",
                                                                                  "hash"])
                 hash_df = pd.concat([hash_df, new_hash], ignore_index=True)
             else:
-                index = hash_df["basic comments"][hash_df["path"] == p.path].index[0]
+                index = hash_df["basic comments"][hash_df["path"] == p].index[0]
                 hash_df.at[index, "basic comments"] = code.basic_comments
                 hash_df.at[index, "multiline comments"] = code.ml_comment
                 hash_df.at[index, "formatted multiline"] = code.ml_formatted
@@ -104,7 +105,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             pass
         df.to_csv(report_path, index=False)
 
-        print("finished:", p.path)
+        print("finished:", p)
     if hash_path:
         hash_df.to_csv(hash_path, index=False)
     return df
@@ -147,4 +148,4 @@ def check_integrity(path, hash_path):
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/test", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
+    test = lintworm("G:/pythonprojects/NEST/LINTWORM/", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")

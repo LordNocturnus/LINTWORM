@@ -3,6 +3,7 @@ import re
 import hashlib
 import os
 import fnmatch
+import pathlib
 
 
 class PathFilter(object):
@@ -59,13 +60,14 @@ class PathFilter(object):
 
         :return:        {list}      list of paths to all files that do not match any patterns
         """
-        for sub_path in os.scandir(os.path.normpath(path)):
-            if not self.match(sub_path):
-                if sub_path.is_dir() and sub_path not in self.folders:
-                    self.folders.append(sub_path)
-                    self.walk_dir(sub_path)
-                elif not sub_path.is_dir():
-                    self.files.append(sub_path)
+        with os.scandir(os.path.normpath(path)) as it:
+            for sub_path in it:
+                if not self.match(sub_path):
+                    if sub_path.is_dir() and sub_path not in self.folders:
+                        self.folders.append(sub_path)
+                        self.walk_dir(sub_path)
+                    elif not sub_path.is_dir():
+                        self.files.append(pathlib.Path(sub_path))
         return self.files
 
 
