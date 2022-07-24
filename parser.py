@@ -644,6 +644,10 @@ class _Method(_Parser):
     def name(self):
         return self.text.split("\n")[0].split("(")[0][4:]
 
+    @property
+    def ret_offset(self):
+        return self.offset - 1
+
     def parameter_check(self):
         ret = []
         for s in self.subcontent:
@@ -789,7 +793,7 @@ class _Property(_Parser):
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# d]')
+        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
         self.offset = 0
 
         self.subcontent_classes.pop(self.subcontent_classes.index(_Function))
