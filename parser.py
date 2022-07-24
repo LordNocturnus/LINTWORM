@@ -269,50 +269,32 @@ class _Bracket(_Parser):
         return df
 
 
-class _StraightBracket(_Parser):
+class _StraightBracket(_Bracket):
 
-    before = re.compile(r"[\w\W]")
     current = re.compile(r"\[")
-    after = re.compile(r"[\w\W]")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"]")
-        self.offset = 1
 
         self.defstr = "straight bracket"
 
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
 
-        return df
+class _CurvedBracket(_Bracket):
 
-
-class _CurvedBracket(_Parser):
-
-    before = re.compile(r"[\w\W]")
     current = re.compile(r"{")
-    after = re.compile(r"[\w\W]")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"}")
-        self.offset = 1
 
         self.defstr = "curved bracket"
 
     @property
     def ret_offset(self):
         return 0
-
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
-
-        return df
 
 
 class _SingleString(_Parser):
@@ -338,7 +320,7 @@ class _SingleString(_Parser):
         return df
 
 
-class _DoubleString(_Parser):
+class _DoubleString(_SingleString):
 
     before = re.compile(r'[^\\"f]')
     current = re.compile(r'"')
@@ -348,69 +330,37 @@ class _DoubleString(_Parser):
         super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]"')
-        self.offset = 2
-
-        self.subcontent_classes = []
 
         self.defstr = "double string"
 
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
 
-        return df
-
-
-class _FormattingSingleString(_Parser):
+class _FormattingSingleString(_SingleString):
 
     before = re.compile(r"f")
-    current = re.compile(r"'")
-    after = re.compile(r"[^']|([^']{2})")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(r"[^\\]'")
-        self.offset = 2
-
-        self.subcontent_classes = [_CurvedBracket]
+        self.subcontent_classes.append(_CurvedBracket)
 
         self.defstr = "formatted single string"
 
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
 
-        return df
-
-
-class _FormattingDoubleString(_Parser):
+class _FormattingDoubleString(_DoubleString):
 
     before = re.compile(r"f")
-    current = re.compile(r'"')
-    after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(r'[^\\]"')
-        self.offset = 2
-
-        self.subcontent_classes = [_CurvedBracket]
+        self.subcontent_classes.append(_CurvedBracket)
 
         self.defstr = "formatted double string"
 
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
 
-        return df
-
-
-class _SingleMultilineString(_Parser):
+class _SingleMultilineString(_SingleString):
 
     before = re.compile(r"[^\\]")
-    current = re.compile(r"'")
     after = re.compile(r"''")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
@@ -419,7 +369,6 @@ class _SingleMultilineString(_Parser):
         self.endchar = re.compile(r"[^\\]'''")
         self.offset = 4
 
-        self.subcontent_classes = []
         self.basic_comments = True
         self.ml_comment = True
 
@@ -475,16 +424,9 @@ class _SingleMultilineString(_Parser):
                         and self.parent.found_yields - self.parent.yields == 0:
                     self.parent.documented = True
 
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
 
-        return df
+class _DoubleMultilineString(_SingleMultilineString):
 
-
-class _DoubleMultilineString(_Parser):
-
-    before = re.compile(r"[^\\]")
     current = re.compile(r'"')
     after = re.compile(r'""')
 
@@ -492,69 +434,8 @@ class _DoubleMultilineString(_Parser):
         super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]"""')
-        self.offset = 4
-
-        self.subcontent_classes = []
-        self.basic_comments = True
-        self.ml_comment = True
 
         self.defstr = "double multiline string"
-
-    def check(self):
-        if isinstance(self.parent, _Class):
-            regex = self.regex["class"]
-        elif isinstance(self.parent, _Function):
-            regex = self.regex["function"]
-        elif isinstance(self.parent, _Method):
-            regex = self.regex["method"]
-        else:
-            regex = None
-
-        if regex:
-            if regex["main"].match(self.text):
-                self.ml_formatted = True
-                param = util.get_regex_instances(self.text, regex["parameter main"])
-                for p in param:
-                    p = regex["parameter start"].sub("", p)
-                    p = regex["parameter end"].sub("", p)
-                    if isinstance(self.parent, _Class):
-                        self.parent.found_parameters.append(p)
-                    else:
-                        self.parent.found_inputs.append(p)
-                self.parent.missing_parameters = list(set(self.parent.parameters) - set(self.parent.found_parameters))
-                self.parent.missing_inputs = list(set(self.parent.inputs) - set(self.parent.found_inputs))
-
-                ret = util.get_regex_instances(self.text, regex["return main"])
-                for r in ret:
-                    r = regex["return start"].sub("", r)
-                    r = regex["return end"].sub("", r)
-                    if r == "":
-                        self.parent.found_returns += 1
-
-                yie = util.get_regex_instances(self.text, regex["yield main"])
-                for y in yie:
-                    y = regex["yield start"].sub("", y)
-                    y = regex["yield end"].sub("", y)
-                    if y == "":
-                        self.parent.found_yields += 1
-
-                rai = util.get_regex_instances(self.text, regex["raise main"])
-                for r in rai:
-                    r = regex["raise start"].sub("", r)
-                    r = regex["raise end"].sub("", r)
-                    self.parent.found_raises.append(r)
-                self.parent.missing_raises = list(set(self.parent.raises) - set(self.parent.found_raises))
-
-                if len(self.parent.missing_parameters) == 0 and len(self.parent.missing_inputs) == 0 and \
-                        len(self.parent.missing_raises) == 0 and self.parent.found_returns - self.parent.returns == 0 \
-                        and self.parent.found_yields - self.parent.yields == 0:
-                    self.parent.documented = True
-
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
-
-        return df
 
 
 class _Comment(_Parser):
@@ -592,6 +473,7 @@ class _Function(_Parser):
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
         self.offset = 0
+        self.filter = []
 
         self.defstr = "function"
 
@@ -621,116 +503,41 @@ class _Function(_Parser):
                         args.append(self.inputs[i])
 
                 for r in args:
-                    print(r)
                     self.inputs.pop(self.inputs.index(r))
+
+                for f in self.filter:
+                    if f in self.inputs:
+                        self.inputs.pop(self.inputs.index(f))
                 break
         return ret
 
 
-class _Method(_Parser):
-
-    before = re.compile(r"[\n ]")
-    current = re.compile(r"d")
-    after = re.compile(r"ef ")
+class _Method(_Function):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
-        self.offset = 0
+        self.filter.append("self")
 
         self.defstr = "method"
 
     @property
-    def name(self):
-        return self.text.split("\n")[0].split("(")[0][4:]
-
-    @property
     def ret_offset(self):
         return self.offset - 1
 
-    def parameter_check(self):
-        ret = []
-        for s in self.subcontent:
-            ret += s.parameter_check()
-            if isinstance(s, _Return):
-                self.returns += 1
-            elif isinstance(s, _Yield):
-                self.yields += 1
-            elif isinstance(s, _Raise):
-                self.raises.append(s.name)
 
-        for s in self.subcontent:
-            if isinstance(s, _Bracket):
-                args = []
-                self.inputs = s.pure_text[1:-1].split(",")
-
-                for i in range(len(self.inputs)):
-                    self.inputs[i] = self.inputs[i].strip().split("=")[0].split(":")[0]
-                    if "*" in self.inputs[i]:
-                        args.append(self.inputs[i])
-
-                for r in args:
-                    print(r)
-                    self.inputs.pop(self.inputs.index(r))
-
-                if "self" in self.inputs:
-                    self.inputs.pop(self.inputs.index("self"))
-                break
-        return ret
-
-
-class _ClassMethod(_Parser):
-
-    before = re.compile(r"[\n ]")
-    current = re.compile(r"d")
-    after = re.compile(r"ef ")
+class _ClassMethod(_Function):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
-        self.offset = 0
+        self.filter.append("cls")
 
         self.defstr = "classmethod"
 
     @property
-    def name(self):
-        return self.text.split("\n")[0].split("(")[0][4:]
-
-    @property
     def ret_offset(self):
         return self.offset - 1
-
-    def parameter_check(self):
-        ret = []
-        for s in self.subcontent:
-            ret += s.parameter_check()
-            if isinstance(s, _Return):
-                self.returns += 1
-            elif isinstance(s, _Yield):
-                self.yields += 1
-            elif isinstance(s, _Raise):
-                self.raises.append(s.name)
-
-        for s in self.subcontent:
-            if isinstance(s, _Bracket):
-                args = []
-                self.inputs = s.pure_text[1:-1].split(",")
-
-                for i in range(len(self.inputs)):
-                    self.inputs[i] = self.inputs[i].strip().split("=")[0].split(":")[0]
-                    if "*" in self.inputs[i]:
-                        args.append(self.inputs[i])
-
-                for r in args:
-                    print(r)
-                    self.inputs.pop(self.inputs.index(r))
-
-                if "cls" in self.inputs:
-                    self.inputs.pop(self.inputs.index("cls"))
-                break
-        return ret
 
 
 class _Class(_Parser):
@@ -813,29 +620,18 @@ class _Return(_Parser):
         return df
 
 
-class _Raise(_Parser):
+class _Raise(_Return):
 
-    before = re.compile(r"\W")
-    current = re.compile(r"r")
     after = re.compile(r"aise ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
-
-        self.endchar = re.compile(r'[\n#]')
-        self.offset = 0
 
         self.defstr = "raise"
 
     @property
     def name(self):
         return self.pure_text[6:]
-
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
-
-        return df
 
 
 class _Property(_Parser):
@@ -959,22 +755,12 @@ class _Argument(_Parser):
         return self.text[1:]
 
 
-class _Yield(_Parser):
+class _Yield(_Return):
 
-    before = re.compile(r"\W")
     current = re.compile(r"y")
     after = re.compile(r"ield ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
 
-        self.endchar = re.compile(r'[\n#]')
-        self.offset = 0
-
         self.defstr = "yield"
-
-    def report(self, df, columns):
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
-
-        return df
