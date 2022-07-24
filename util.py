@@ -33,7 +33,6 @@ class PathFilter(object):
             line = line[:-1]
             line = line.split("#")[0]
             if re.search(r"\W", line):
-                print(line)
                 patterns.append(line)
         return cls(patterns)
 
@@ -60,11 +59,12 @@ class PathFilter(object):
 
         :return:        {list}      list of paths to all files that do not match any patterns
         """
+        path = os.path.realpath(path)
+        self.folders.append(path)
         with os.scandir(os.path.normpath(path)) as it:
             for sub_path in it:
-                if not self.match(sub_path):
-                    if sub_path.is_dir() and sub_path not in self.folders:
-                        self.folders.append(sub_path)
+                if not self.match(sub_path) and os.path.realpath(sub_path.path) not in self.folders:
+                    if sub_path.is_dir():
                         self.walk_dir(sub_path)
                     elif not sub_path.is_dir():
                         self.files.append(pathlib.Path(sub_path))
