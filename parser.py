@@ -611,11 +611,17 @@ class _Function(_Parser):
 
         for s in self.subcontent:
             if isinstance(s, _Bracket):
-                inputs = s.pure_text[1:-1].split(",")
+                args = []
+                self.inputs = s.pure_text[1:-1].split(",")
 
-                for i in range(len(inputs)):
-                    inputs[i] = inputs[i].strip().split("=")[0]
-                self.inputs = inputs
+                for i in range(len(self.inputs)):
+                    self.inputs[i] = self.inputs[i].strip().split("=")[0].split(":")[0]
+                    if "*" in self.inputs[i]:
+                        args.append(self.inputs[i])
+
+                for r in args:
+                    print(r)
+                    self.inputs.pop(self.inputs.index(r))
                 break
         return ret
 
@@ -651,14 +657,20 @@ class _Method(_Parser):
 
         for s in self.subcontent:
             if isinstance(s, _Bracket):
-                inputs = s.pure_text[1:-1].split(",")
+                args = []
+                self.inputs = s.pure_text[1:-1].split(",")
 
-                for i in range(len(inputs)):
-                    inputs[i] = inputs[i].strip().split("=")[0]
+                for i in range(len(self.inputs)):
+                    self.inputs[i] = self.inputs[i].strip().split("=")[0].split(":")[0]
+                    if "*" in self.inputs[i]:
+                        args.append(self.inputs[i])
 
-                if "self" in inputs:
-                    inputs.pop(inputs.index("self"))
-                self.inputs = inputs
+                for r in args:
+                    print(r)
+                    self.inputs.pop(self.inputs.index(r))
+
+                if "self" in self.inputs:
+                    self.inputs.pop(self.inputs.index("self"))
                 break
         return ret
 

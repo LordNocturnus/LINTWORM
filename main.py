@@ -147,7 +147,4 @@ def check_integrity(path, hash_path):
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/LINTWORM", filter=["*\\parser.py", "*\\.git", "*\\.idea"],
-                    hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
-
-    temp = check_integrity("G:/pythonprojects/NEST/LINTWORM/parser.py", "G:/pythonprojects/NEST/LINTWORM/hash.csv")
+    test = lintworm("G:/pythonprojects/NEST/test", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv")
