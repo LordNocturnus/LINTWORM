@@ -194,9 +194,9 @@ def check_hash(text, df, path, level="documented"):
                                         sha256 hash of text
     """
     text_hash = hashlib.sha256(text.encode()).hexdigest()
-    if path in np.asarray(df["path"]):
-        if np.asarray(df["hash"][df["path"] == path])[0] == text_hash:
-            if np.asarray(df[level][df["path"] == path])[0]:
+    if str(path) in np.asarray(df["path"]):
+        if np.asarray(df["hash"][df["path"] == str(path)])[0] == text_hash:
+            if np.asarray(df[level][df["path"] == str(path)])[0]:
                 return True, True, text_hash
         return False, True, text_hash
     return False, False, text_hash
