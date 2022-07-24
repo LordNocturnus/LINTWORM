@@ -48,7 +48,8 @@ class _Parser(object):
                                    _Raise,
                                    _Property,
                                    _Argument,
-                                   _Yield]
+                                   _Yield,
+                                   _ClassMethodArgument]
 
         self.basic_comments = False
         self.ml_comment = False
@@ -679,6 +680,59 @@ class _Method(_Parser):
         return ret
 
 
+class _ClassMethod(_Parser):
+
+    before = re.compile(r"[\n ]")
+    current = re.compile(r"d")
+    after = re.compile(r"ef ")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
+        self.offset = 0
+
+        self.defstr = "classmethod"
+
+    @property
+    def name(self):
+        return self.text.split("\n")[0].split("(")[0][4:]
+
+    @property
+    def ret_offset(self):
+        return self.offset - 1
+
+    def parameter_check(self):
+        ret = []
+        for s in self.subcontent:
+            ret += s.parameter_check()
+            if isinstance(s, _Return):
+                self.returns += 1
+            elif isinstance(s, _Yield):
+                self.yields += 1
+            elif isinstance(s, _Raise):
+                self.raises.append(s.name)
+
+        for s in self.subcontent:
+            if isinstance(s, _Bracket):
+                args = []
+                self.inputs = s.pure_text[1:-1].split(",")
+
+                for i in range(len(self.inputs)):
+                    self.inputs[i] = self.inputs[i].strip().split("=")[0].split(":")[0]
+                    if "*" in self.inputs[i]:
+                        args.append(self.inputs[i])
+
+                for r in args:
+                    print(r)
+                    self.inputs.pop(self.inputs.index(r))
+
+                if "cls" in self.inputs:
+                    self.inputs.pop(self.inputs.index("cls"))
+                break
+        return ret
+
+
 class _Class(_Parser):
 
     before = re.compile(r"\s")
@@ -820,6 +874,36 @@ class _Property(_Parser):
         return ret
 
 
+class _ClassMethodArgument(_Parser):
+
+    before = re.compile(r"\W")
+    current = re.compile(r"@")
+    after = re.compile(r"classmethod")
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        super().__init__(text, path, regex, parent, indent)
+
+        self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
+        self.offset = 0
+
+        self.subcontent_classes.pop(self.subcontent_classes.index(_Function))
+        self.subcontent_classes.append(_ClassMethod)
+
+        self.defstr = "classmethodargument"
+
+    def report(self, df, columns):
+        for sub in self.subcontent:
+            df = sub.report(df, columns)
+
+        return df
+
+    def parameter_check(self):
+        ret = []
+        for s in self.subcontent:
+            ret += s.parameter_check()
+        return ret
+
+
 class _ClassParameter(_Parser):
 
     before = re.compile(r"\W")
@@ -854,7 +938,7 @@ class _Argument(_Parser):
 
     before = re.compile(r"[\W\w]")
     current = re.compile(r"\n")
-    after = re.compile(r"[ ]*@[^\Wp]")
+    after = re.compile(r"[ ]*@[^\Wpc]")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         super().__init__(text, path, regex, parent, indent)
