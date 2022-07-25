@@ -568,7 +568,7 @@ class _Class(_Parser):
         self.parameters = list(set(self.parameters))
         for p in self.parameters:
             for s in self.subcontent:
-                if p == s.name:
+                if p == s.name and isinstance(s, _Method):
                     self.parameters.pop(self.parameters.index(p))
         return []
 
