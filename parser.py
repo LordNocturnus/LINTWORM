@@ -203,10 +203,6 @@ class _Parser(object):
         return c + self.offset
 
     def check(self):
-        """
-
-        :return:
-        """
         sub_ml_comment = []
         sub_ml_formatted = []
         documented = []
