@@ -5,6 +5,53 @@ import util
 
 
 class _Parser(object):
+    """
+        Core class of lintworm with all basic functions for iterating through python code. On specified character
+        sequences this class hands over iteration control to one of its subclasses each tailored to a certain component
+        in python code.
+
+    :param basic_comments:      {bool}          code contains atleast one comment or multiline string
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param documented:          {bool}          code piece has a formatted docstring that contains all parameters,
+                                                inputs, returns, raises and yields
+    :param end:                 {int}           index of the last character that is part of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param found_inputs:        {list}          all inputs that are documented in a functions or methods docstring
+    :param found_parameters:    {list}          all parameters that are documented in a classes docstring
+    :param found_raises:        {list}          all errors that are documented in a functions or methods docstring
+    :param found_returns:       {int}           number of all returns documented in a functions or methods docstring
+    :param found_yields:        {int}           number of all yields documented in a functions or methods docstring
+    :param indent:              {int}           number of spaces ahead of the definition of a function, method or class
+    :param inputs:              {list}          all input parameters of a function or method
+    :param ml_comment:          {bool}          atleast one subcomponent is a multiline comment
+    :param ml_formatted:        {bool}          one of the subcontent is a multiline comment following hte formatting
+                                                defined in regex
+    :param name:                {str}           name of the current code piece
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param parameters:          {list}          all parameters found in the current code piece
+    :param parent:              {_Parser, None} parent class which contains the instance of the _Parser class. For the
+                                                base class usually None due to being the primary initialized class for
+                                                new files
+    :param path:                {PathLike}      path to the parent file containing all parsed python code
+    :param pure_text:           {str}           text that is only part of the current code piece and not contained in
+                                                any subcontent
+    :param raises:              {list}          all errors found in the current code piece
+    :param regex:               {dict}          different regex patterns used to check docstrings for formatting and
+                                                completeness. completeness is defined as containing all relevant inputs/
+                                                parameters, returns, raises and yields
+    :param ret_offset:          {int}           offset on how many characters after endchar match to restart parsing in
+                                                parent
+    :param returns:             {int}           count of all returns found in current code piece
+    :param start:               {int}           index of the first character of the current code piece
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                _Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of _Parser on some level
+    :param text:                {str}           all code handled by the current instance of _Parser
+    :param yields:              {int}           count of all yield found in the current code piece
+    """
 
     def __init__(self, text, path, regex, parent=None, indent=0):
         """
@@ -72,20 +119,49 @@ class _Parser(object):
 
     @property
     def name(self):
+        """
+            name of the code piece
+
+        :return:    {str}   base parser class does not have a name
+        """
         return ""
 
     @property
     def ret_offset(self):
+        """
+            offset after match of endchar at which to restart parsing of the parent not really applicable in the base
+            class
+
+        :return:    {int}   number of characters to skip
+        """
         return self.offset
 
     @property
     def pure_text(self):
+        """
+            text containing all code that is not part of any subcontent
+
+        :return:    {str}   code without subcontent
+        """
         text = self.text
         for s in self.subcontent:
             text = text.replace(s.text, "")
         return text
 
     def parse(self, start=0):
+        """
+            parse iterates over the code character by character checking for any matches with the instances subcontent
+            classes or the endchar. Should a full match with a subcontent class be found a new instance of said class is
+            created, added to subcontent and given parsing authority. Should the endchar be matched parsing authority is
+            given back to the parent with the text parsed by the current instance being skipped. Lastly if a linebreak
+            is parsed the current indent is updated to correctly detect end of functions, methods and classes
+
+        :param start:   {int}   index of the first character in the complete code
+
+        :return:        {int}   indicates howmuch code was parsed by the current instance to parent before matching
+                                endchar and hands back parsing authority to parent
+        :return:        {int}   end of file was reached returning index of last chararacter to parent
+        """
         self.start = start
         current_indent = self.indent
 
