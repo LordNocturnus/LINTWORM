@@ -202,33 +202,33 @@ def check_hash(text, df, path, level="documented"):
     return False, False, text_hash
 
 
-standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_classregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                        "parameter start": r"[ ]*:param ",
-                       "parameter end": r":[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                       "parameter end": r":[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                        "return start": r"[ ]*:return:",
                        "return end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                        "yield start": r"[ ]*:return:",
-                       "yield end": r"[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                       "yield end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                        "raise start": r"[ ]*:raise:[ ]+",
                        "raise end": r"[\s]*\n"}
 
-standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_functionregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                           "parameter start": r"[ ]*:param ",
-                          "parameter end": r":[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                          "parameter end": r":[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                           "return start": r"[ ]*:return:",
                           "return end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                           "yield start": r"[ ]*:yield:",
-                          "yield end": r"[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                          "yield end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                           "raise start": r"[ ]*:raise:[ ]+",
                           "raise end": r"[\s]*\n"}
 
-standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
+standard_methodregex = {"main": r'[ ]*"""\n([ ]*[^\n]+\n)+(\n([ ]*:param [\w]+:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:return:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:yield:[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+)+)?(\n([ ]*:raise:[ ]+[\w.]+[ ]*\n)+)?[ ]*"""',
                         "parameter start": r"[ ]*:param ",
-                        "parameter end": r":[ ]+{[\w,.]+}([ ]+[^:\n]+\n)+",
+                        "parameter end": r":[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                         "return start": r"[ ]*:return:",
-                        "return end": r"[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                        "return end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                         "yield start": r"[ ]*:yield:",
-                        "yield end": r"[ ]+{[\w.,]+}([ ]+[^:\n]+\n)+",
+                        "yield end": r"[ ]+{[\w., ]+}([ ]+[^:\n]+\n)+",
                         "raise start": r"[ ]*:raise:[ ]+",
                         "raise end": r"[ ]*\n"}
 
