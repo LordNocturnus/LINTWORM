@@ -9,7 +9,8 @@ import util
 
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
-             columns=util.standard_columns, hash_path=None, level="documented", filter=None):
+             columns=util.standard_columns, hash_path=None, level="documented", file_filter=None,
+             class_attribute=False):
     """
         main function of lintwork. It checks all python files in the given folder for a certain level of documentation
 
@@ -65,8 +66,9 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                                                                        docstrings
                                             "documented"            -> parser is run over files with incomplete
                                                                        docstrings
-    :param filter:          {Pathlike,list} list containing strings following the glob format path to a file following
-                                            the .gitignore format
+    :param file_filter:     {Pathlike,list} list containing strings following the glob format path to a file
+                                            following the .gitignore format
+    :param class_attribute: {bool}          if true include class attributes in the docstring of classes
 
     :return:                {DataFrame}     pandas dataframe identical to the generated lintworm report
     """
@@ -101,19 +103,19 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                                                 "formatted multiline", "documented", "hash"])
 
     # prepare a PathFilter class and collect all paths
-    if isinstance(filter, os.PathLike) or type(filter) == str:
-        filter = util.PathFilter.from_file(filter)
-    elif type(filter) == list or type(filter) == tuple:
-        filter = util.PathFilter(filter)
+    if isinstance(file_filter, os.PathLike) or type(file_filter) == str:
+        file_filter = util.PathFilter.from_file(file_filter)
+    elif type(file_filter) == list or type(file_filter) == tuple:
+        file_filter = util.PathFilter(file_filter)
     else:
-        filter = util.PathFilter([])
+        file_filter = util.PathFilter([])
 
     paths = []
     if os.path.isfile(path):
-        if path[-3:] == ".py" and not filter.match(path):
+        if path[-3:] == ".py" and not file_filter.match(path):
             paths.append(pathlib.Path(path))
     else:
-        paths = filter.walk_dir(path)
+        paths = file_filter.walk_dir(path)
 
     # itterate through all files and check them if they are a .py file
     for p in paths:
@@ -129,7 +131,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             valid = False
 
         if valid and hashed:
-            code = parser._Parser("", p, regex)
+            code = parser._Parser("", p, regex, class_attribute=class_attribute)
             code.basic_comments = hash_df["basic comments"][hash_df["path"] == str(p)].iloc[0]
             code.ml_comment = hash_df["multiline comments"][hash_df["path"] == str(p)].iloc[0]
             code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == str(p)].iloc[0]
@@ -212,4 +214,4 @@ def check_integrity(path, hash_path):
 
 if __name__ == "__main__":
     test = lintworm("G:/pythonprojects/NEST/LINTWORM", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv",
-                    filter=["*\\.git", "*\\.idea"])
+                    file_filter=["*\\.git", "*\\.idea"])

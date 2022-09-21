@@ -53,7 +53,8 @@ class _Parser(object):
     :param yields:              {int}           count of all yield found in the current code piece
     """
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         """
             initializes the _Parser class by adding all necessary parameters
 
@@ -70,6 +71,13 @@ class _Parser(object):
         self.regex = regex
         self.parent = parent
         self.indent = indent
+        self.func_param = func_param
+        self.func_raise = func_raise
+        self.func_return = func_return
+        self.method_param = method_param
+        self.method_raise = method_raise
+        self.method_return = method_return
+        self.class_attribute = class_attribute
 
         self.start = None
         self.end = None
@@ -175,7 +183,10 @@ class _Parser(object):
             for sub in self.subcontent_classes:
                 if sub.before.match(self.text[c-1]) and sub.current.match(self.text[c]) and \
                         sub.after.match(self.text[c+1:]):
-                    new_sub = sub(self.text[c:], self.path, self.regex, self, current_indent)
+                    new_sub = sub(self.text[c:], self.path, self.regex, self, current_indent,
+                                  func_param=self.func_param, func_raise=self.func_raise, func_return=self.func_return,
+                                  method_param=self.method_param, method_raise=self.method_raise,
+                                  method_return=self.method_return, class_attribute=self.class_attribute)
                     break
             if new_sub:
                 delta = new_sub.parse(start=self.start+c)
@@ -204,8 +215,12 @@ class _Parser(object):
 
     def check(self):
         """
-
-        :return:
+            iterates through all items of subcontent and sets level of documentation. Basic comments is set if any
+            subcontent has basic comments or if any subcontent is a comment or multiline string. multiline string is
+             set when any direct (meaning not subsubcontent) subcontent is a multiline string. multiline formatted
+            is set when a multiline string follows the commenting format. also sets multiline commented, multiline
+            formatted or documented, when all contained classes functions and methods have a multiline comment fulfill
+            the corresponding requirements
         """
         sub_ml_comment = []
         sub_ml_formatted = []
@@ -237,6 +252,14 @@ class _Parser(object):
             self.documented = True
 
     def report(self, df, columns):
+        """
+            appends the requested data of itself and then all subcontent to the report dataframe
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         data = []
         col = []
         if "path" in columns:
@@ -321,6 +344,11 @@ class _Parser(object):
         return df
 
     def parameter_check(self):
+        """
+            collects all parameters of its subcontent in a list
+
+        :return: {list} all parameters found in subcontent
+        """
         ret = []
         for s in self.subcontent:
             ret += s.parameter_check()
@@ -328,13 +356,41 @@ class _Parser(object):
 
 
 class _Bracket(_Parser):
+    """
+        subclass of parser to detect and handle bracket structures in python code
+
+    :param before:      {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                        character
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:       {re.Pattern}    pattern to match after the current character
+    :param endchar:     {re.Pattern}    pattern that indicates the end of this code structure
+    :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
+                                        is matched
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of _Parser
+    """
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"\(")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+        """
+            initializes the _Bracket class by inheriting all parameters of _Parser and overwriting endchar, offset and
+            defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r"\)")
         self.offset = 1
@@ -342,6 +398,14 @@ class _Bracket(_Parser):
         self.defstr = "bracket"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include brackets in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
 
         for sub in self.subcontent:
             df = sub.report(df, columns)
@@ -350,11 +414,32 @@ class _Bracket(_Parser):
 
 
 class _StraightBracket(_Bracket):
+    """
+        subclass of bracket to detect and handle straight bracket structures in python code
+
+    :param current: {re.Pattern}    pattern indicating the start character of this code structure
+    :param endchar: {re.Pattern}    pattern that indicates the end of this code structure
+    :param defstr:  {str}           string defining the type of the current code piece
+    """
 
     current = re.compile(r"\[")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        """
+            initializes the _StraightBracket class by inheriting all parameters of _Bracket and overwriting endchar and
+            defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r"]")
 
@@ -362,11 +447,33 @@ class _StraightBracket(_Bracket):
 
 
 class _CurvedBracket(_Bracket):
+    """
+        subclass of bracket to detect and handle curved bracket structures in python code
+
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param endchar:     {re.Pattern}    pattern that indicates the end of this code structure
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param ret_offset:  {int}           offset on how many characters after endchar match to restart parsing in parent
+    """
 
     current = re.compile(r"{")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        """
+            initializes the _CurvedBracket class by inheriting all parameters of _Bracket and overwriting endchar and
+            defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+                """
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r"}")
 
@@ -378,13 +485,40 @@ class _CurvedBracket(_Bracket):
 
 
 class _SingleString(_Parser):
+    """
+        subclass of parser to detect and handle simple single quote string structures in python code
+
+    :param before:      {re.Pattern}    pattern indicating the allowed characters that can be before the current
+     character
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:       {re.Pattern}    pattern to match after the current character
+    :param endchar:     {re.Pattern}    pattern that indicates the end of this code structure
+    :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
+                                        is matched
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of _Parser
+    """
 
     before = re.compile(r"[^\\'f]")
     current = re.compile(r"'")
     after = re.compile(r"[^']|([^']{2})")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        """
+            initializes the _SingleString class by inheriting all parameters of _Parser and overwriting endchar, offset,
+            and defstr. The subcontent_classes list is overwritten to only contain the relevant subcontent
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r"[^\\]'")
         self.offset = 2
@@ -394,6 +528,14 @@ class _SingleString(_Parser):
         self.defstr = "single string"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include strings in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -401,13 +543,36 @@ class _SingleString(_Parser):
 
 
 class _DoubleString(_SingleString):
+    """
+       subclass of SingleString to detect and handle simple double quote string structures in python code
+
+    :param before:  {re.Pattern}    pattern indicating the allowed characters that can be before the current character
+    :param current: {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:   {re.Pattern}    pattern to match after the current character
+    :param endchar: {re.Pattern}    pattern that indicates the end of this code structure
+    :param defstr:  {str}           string defining the type of the current code piece
+    """
 
     before = re.compile(r'[^\\"f]')
     current = re.compile(r'"')
     after = re.compile(r'[^"]|([^"]{2})')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        """
+            initializes the _DoubleString class by inheriting all parameters of _SingleString and overwriting endchar
+            and defstr.
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'[^\\]"')
 
@@ -419,7 +584,9 @@ class _FormattingSingleString(_SingleString):
     before = re.compile(r"f")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.subcontent_classes.append(_CurvedBracket)
 
@@ -431,7 +598,9 @@ class _FormattingDoubleString(_DoubleString):
     before = re.compile(r"f")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.subcontent_classes.append(_CurvedBracket)
 
@@ -444,7 +613,9 @@ class _SingleMultilineString(_SingleString):
     after = re.compile(r"''")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r"[^\\]'''")
         self.offset = 4
@@ -511,7 +682,9 @@ class _DoubleMultilineString(_SingleMultilineString):
     after = re.compile(r'""')
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'[^\\]"""')
 
@@ -525,7 +698,9 @@ class _Comment(_Parser):
     after = re.compile(r"[\w\W]")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'[^\\]\n')
         self.offset = 2
@@ -536,6 +711,14 @@ class _Comment(_Parser):
         self.defstr = "comment"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include comments in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -549,7 +732,9 @@ class _Function(_Parser):
     after = re.compile(r"ef ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
         self.offset = 0
@@ -595,7 +780,9 @@ class _Function(_Parser):
 class _Method(_Function):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.filter.append("self")
 
@@ -609,7 +796,9 @@ class _Method(_Function):
 class _ClassMethod(_Function):
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.filter.append("cls")
 
@@ -627,7 +816,9 @@ class _Class(_Parser):
     after = re.compile(r"lass ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
         self.offset = 0
@@ -660,7 +851,9 @@ class _Parameter(_Parser):
     after = re.compile(r"elf\.")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'[^\.\w]')
         self.offset = 0
@@ -670,6 +863,14 @@ class _Parameter(_Parser):
         self.defstr = "parameter"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include parameters in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -690,7 +891,9 @@ class _Return(_Parser):
     after = re.compile(r"eturn ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'[\n#]')
         self.offset = 0
@@ -698,6 +901,14 @@ class _Return(_Parser):
         self.defstr = "return"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include returns in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -709,7 +920,9 @@ class _Raise(_Return):
     after = re.compile(r"aise ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.defstr = "raise"
 
@@ -725,7 +938,9 @@ class _Property(_Parser):
     after = re.compile(r"property")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
         self.offset = 0
@@ -736,6 +951,14 @@ class _Property(_Parser):
         self.defstr = "property"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include Properties in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -761,7 +984,9 @@ class _ClassMethodArgument(_Parser):
     after = re.compile(r"classmethod")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
         self.offset = 0
@@ -772,6 +997,14 @@ class _ClassMethodArgument(_Parser):
         self.defstr = "classmethodargument"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include class method arguments in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -785,7 +1018,9 @@ class _ClassParameter(_Parser):
     after = re.compile(r"[\w]*[ ]+=")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(r'\W')
         self.offset = 0
@@ -795,6 +1030,14 @@ class _ClassParameter(_Parser):
         self.defstr = "class parameter"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include Class Parameters in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -815,7 +1058,9 @@ class _Argument(_Parser):
     after = re.compile(r"[ ]*@[^\Wpc]")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.endchar = re.compile(f'\n')
         self.offset = 0
@@ -823,6 +1068,14 @@ class _Argument(_Parser):
         self.defstr = "argument"
 
     def report(self, df, columns):
+        """
+            overwrites parent report methode to not include arguments in the report
+
+        :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
+        :param columns: {list}              contains all columns requested to be added to the lintworm report
+
+        :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
+        """
         for sub in self.subcontent:
             df = sub.report(df, columns)
 
@@ -839,6 +1092,8 @@ class _Yield(_Return):
     after = re.compile(r"ield ")
 
     def __init__(self, text, path, regex, parent=None, indent=0):
-        super().__init__(text, path, regex, parent, indent)
+        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
+                         func_return=func_return, method_param=method_param, method_raise=method_raise,
+                         method_return=method_return, class_attribute=class_attribute)
 
         self.defstr = "yield"
