@@ -10,18 +10,14 @@ import sys
 #     version = ns['version']
 
 setup(
-    name='DRAGONS',
-    version='0.0.1',
-    description='Overarching framework for working with ODESSA',
+    name='LINTWORM',
+    version='0.1.0',
+    description='A python parser for checking the state of documentation',
     author='Delft Aerospace Rocket Engineering',
     author_email='felix@lagarden.de',
     # url='',
 
-    install_requires=['gitpython',
-                      'pyqt5',
-                      "matplotlib",
-                      "pandas",
-                      "scipy"],
+    install_requires=["pandas"],
 
     packages=find_packages('.', exclude=["test"]),
     classifiers=[

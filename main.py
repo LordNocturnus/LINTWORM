@@ -213,5 +213,8 @@ def check_integrity(path, hash_path):
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/NEST/LINTWORM", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv",
-                    file_filter=["*\\.git", "*\\.idea"])
+    test = lintworm("G:/pythonprojects/stratosiv", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv",
+                    file_filter=["*\\.git", "*\\.idea",
+                                 "G:\\pythonprojects\\stratosiv\\Libraries\\rocket-simulations\\examples\\Stratos_II_MC\\get-pip.py",
+                                 "G:\\pythonprojects\\stratosiv\\Libraries\\rocket-simulations\\src\\DTST\\Tools\\dmca\\analysis\\parser.py"], columns=["path", "name", "type"])
+    print("FINISHED")

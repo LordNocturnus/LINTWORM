@@ -424,7 +424,8 @@ class _StraightBracket(_Bracket):
 
     current = re.compile(r"\[")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         """
             initializes the _StraightBracket class by inheriting all parameters of _Bracket and overwriting endchar and
             defstr
@@ -458,7 +459,8 @@ class _CurvedBracket(_Bracket):
 
     current = re.compile(r"{")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         """
             initializes the _CurvedBracket class by inheriting all parameters of _Bracket and overwriting endchar and
             defstr
@@ -503,7 +505,8 @@ class _SingleString(_Parser):
     current = re.compile(r"'")
     after = re.compile(r"[^']|([^']{2})")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         """
             initializes the _SingleString class by inheriting all parameters of _Parser and overwriting endchar, offset,
             and defstr. The subcontent_classes list is overwritten to only contain the relevant subcontent
@@ -557,7 +560,8 @@ class _DoubleString(_SingleString):
     current = re.compile(r'"')
     after = re.compile(r'[^"]|([^"]{2})')
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         """
             initializes the _DoubleString class by inheriting all parameters of _SingleString and overwriting endchar
             and defstr.
@@ -583,7 +587,8 @@ class _FormattingSingleString(_SingleString):
 
     before = re.compile(r"f")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -597,7 +602,8 @@ class _FormattingDoubleString(_DoubleString):
 
     before = re.compile(r"f")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -612,7 +618,8 @@ class _SingleMultilineString(_SingleString):
     before = re.compile(r"[^\\]")
     after = re.compile(r"''")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -681,7 +688,8 @@ class _DoubleMultilineString(_SingleMultilineString):
     current = re.compile(r'"')
     after = re.compile(r'""')
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -697,7 +705,8 @@ class _Comment(_Parser):
     current = re.compile(r"#")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -731,7 +740,8 @@ class _Function(_Parser):
     current = re.compile(r"d")
     after = re.compile(r"ef ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -779,7 +789,8 @@ class _Function(_Parser):
 
 class _Method(_Function):
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -795,7 +806,8 @@ class _Method(_Function):
 
 class _ClassMethod(_Function):
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -815,7 +827,8 @@ class _Class(_Parser):
     current = re.compile(r"c")
     after = re.compile(r"lass ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -850,7 +863,8 @@ class _Parameter(_Parser):
     current = re.compile(r"s")
     after = re.compile(r"elf\.")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -890,7 +904,8 @@ class _Return(_Parser):
     current = re.compile(r"r")
     after = re.compile(r"eturn ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -919,7 +934,8 @@ class _Raise(_Return):
 
     after = re.compile(r"aise ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -937,7 +953,8 @@ class _Property(_Parser):
     current = re.compile(r"@")
     after = re.compile(r"property")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -983,7 +1000,8 @@ class _ClassMethodArgument(_Parser):
     current = re.compile(r"@")
     after = re.compile(r"classmethod")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -1017,7 +1035,8 @@ class _ClassParameter(_Parser):
     current = re.compile(r"\w")
     after = re.compile(r"[\w]*[ ]+=")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -1057,7 +1076,8 @@ class _Argument(_Parser):
     current = re.compile(r"\n")
     after = re.compile(r"[ ]*@[^\Wpc]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
@@ -1091,7 +1111,8 @@ class _Yield(_Return):
     current = re.compile(r"y")
     after = re.compile(r"ield ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0):
+    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
+                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
         super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
                          func_return=func_return, method_param=method_param, method_raise=method_raise,
                          method_return=method_return, class_attribute=class_attribute)
