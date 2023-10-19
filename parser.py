@@ -4,7 +4,7 @@ import re
 import util
 
 
-class _Parser(object):
+class Parser(object):
     """
         Core class of lintworm with all basic functions for iterating through python code. On specified character
         sequences this class hands over iteration control to one of its subclasses each tailored to a certain component
@@ -31,7 +31,7 @@ class _Parser(object):
     :param offset:              {int}           how many characters are to be included in text after the endchar regex
                                                 pattern is matched
     :param parameters:          {list}          all parameters found in the current code piece
-    :param parent:              {_Parser, None} parent class which contains the instance of the _Parser class. For the
+    :param parent:              {Parser, None}  parent class which contains the instance of the Parser class. For the
                                                 base class usually None due to being the primary initialized class for
                                                 new files
     :param path:                {PathLike}      path to the parent file containing all parsed python code
@@ -46,24 +46,23 @@ class _Parser(object):
     :param returns:             {int}           count of all returns found in current code piece
     :param start:               {int}           index of the first character of the current code piece
     :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
-                                                _Parser
+                                                Parser
     :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
-                                                purposes all of them subclasses of _Parser on some level
-    :param text:                {str}           all code handled by the current instance of _Parser
+                                                purposes all of them subclasses of Parser on some level
+    :param text:                {str}           all code handled by the current instance of Parser
     :param yields:              {int}           count of all yield found in the current code piece
     """
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
-            initializes the _Parser class by adding all necessary parameters
+            initializes the Parser class by adding all necessary parameters
 
         :param text:    {str}       the code which is to be analysed for documentation
         :param path:    {Pathlike}  abspath to file from which the text is taken
-        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
-                                    for multiline comment formatting. Currently implemented are functions, methods and
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked for
+                                    multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
         """
         self.text = text
@@ -71,13 +70,6 @@ class _Parser(object):
         self.regex = regex
         self.parent = parent
         self.indent = indent
-        self.func_param = func_param
-        self.func_raise = func_raise
-        self.func_return = func_return
-        self.method_param = method_param
-        self.method_raise = method_raise
-        self.method_return = method_return
-        self.class_attribute = class_attribute
 
         self.start = None
         self.end = None
@@ -130,9 +122,9 @@ class _Parser(object):
         """
             name of the code piece
 
-        :return:    {str}   base parser class does not have a name
+        :return:    {str}   file name for the base parser class
         """
-        return ""
+        return self.path.parts[-1]
 
     @property
     def ret_offset(self):
@@ -173,7 +165,7 @@ class _Parser(object):
         self.start = start
         current_indent = self.indent
 
-        if type(self) == _Parser:
+        if type(self) == Parser:
             c = 0
         else:
             c = 1
@@ -183,10 +175,7 @@ class _Parser(object):
             for sub in self.subcontent_classes:
                 if sub.before.match(self.text[c-1]) and sub.current.match(self.text[c]) and \
                         sub.after.match(self.text[c+1:]):
-                    new_sub = sub(self.text[c:], self.path, self.regex, self, current_indent,
-                                  func_param=self.func_param, func_raise=self.func_raise, func_return=self.func_return,
-                                  method_param=self.method_param, method_raise=self.method_raise,
-                                  method_return=self.method_return, class_attribute=self.class_attribute)
+                    new_sub = sub(self.text[c:], self.path, self.regex, self, current_indent)
                     break
             if new_sub:
                 delta = new_sub.parse(start=self.start+c)
@@ -245,18 +234,21 @@ class _Parser(object):
             self.ml_formatted = True
         if all(documented) and not len(documented) == 0 and not isinstance(self, (_Class, _Function, _Method)):
             self.documented = True
-        if type(self) == _Parser and len(sub_ml_comment) == 0 and len(sub_ml_formatted) == 0 and len(documented) == 0:
+        if not all(documented) and not len(documented) == 0 and isinstance(self, (_Class, _Function, _Method)):
+            self.documented = False
+        if type(self) == Parser and len(sub_ml_comment) == 0 and len(sub_ml_formatted) == 0 and len(documented) == 0:
             self.basic_comments = True
             self.ml_comment = True
             self.ml_formatted = True
             self.documented = True
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
             appends the requested data of itself and then all subcontent to the report dataframe
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -338,8 +330,9 @@ class _Parser(object):
         datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
 
-        for sub in self.subcontent:
-            df = sub.report(df, columns)
+        if all and not self.documented:
+            for sub in self.subcontent:
+                df = sub.report(df, columns, all)
 
         return df
 
@@ -355,7 +348,7 @@ class _Parser(object):
         return ret
 
 
-class _Bracket(_Parser):
+class _Bracket(Parser):
     """
         subclass of parser to detect and handle bracket structures in python code
 
@@ -367,17 +360,16 @@ class _Bracket(_Parser):
     :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
                                         is matched
     :param defstr:      {str}           string defining the type of the current code piece
-    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of _Parser
+    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of Parser
     """
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"\(")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
-            initializes the _Bracket class by inheriting all parameters of _Parser and overwriting endchar, offset and
+            initializes the _Bracket class by inheriting all parameters of Parser and overwriting endchar, offset and
             defstr
 
         :param text:    {str}       the code which is to be analysed for documentation
@@ -385,24 +377,23 @@ class _Bracket(_Parser):
         :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
                                     for multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
         """
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"\)")
         self.offset = 1
 
         self.defstr = "bracket"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=True):
         """
-            overwrites parent report methode to not include brackets in the report
+            overwrites parent report method to not include brackets in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -424,8 +415,7 @@ class _StraightBracket(_Bracket):
 
     current = re.compile(r"\[")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
             initializes the _StraightBracket class by inheriting all parameters of _Bracket and overwriting endchar and
             defstr
@@ -435,12 +425,10 @@ class _StraightBracket(_Bracket):
         :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
                                     for multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
         """
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"]")
 
@@ -459,8 +447,7 @@ class _CurvedBracket(_Bracket):
 
     current = re.compile(r"{")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
             initializes the _CurvedBracket class by inheriting all parameters of _Bracket and overwriting endchar and
             defstr
@@ -470,12 +457,10 @@ class _CurvedBracket(_Bracket):
         :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
                                     for multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
                 """
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"}")
 
@@ -483,32 +468,39 @@ class _CurvedBracket(_Bracket):
 
     @property
     def ret_offset(self):
+        """
+            offset after match of endchar should be 0 for _CurvedBracket to not accidentally skip potential new pattern
+
+        :return:    {int}   number of characters to skip
+        """
         return 0
 
 
-class _SingleString(_Parser):
+class _SingleString(Parser):
     """
         subclass of parser to detect and handle simple single quote string structures in python code
 
-    :param before:      {re.Pattern}    pattern indicating the allowed characters that can be before the current
-     character
-    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
-    :param after:       {re.Pattern}    pattern to match after the current character
-    :param endchar:     {re.Pattern}    pattern that indicates the end of this code structure
-    :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
-                                        is matched
-    :param defstr:      {str}           string defining the type of the current code piece
-    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of _Parser
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param endchar:             {re.Pattern}    pattern that indicates the end of this code structure
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
     """
 
     before = re.compile(r"[^\\'f]")
     current = re.compile(r"'")
     after = re.compile(r"[^']|([^']{2})")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
-            initializes the _SingleString class by inheriting all parameters of _Parser and overwriting endchar, offset,
+            initializes the _SingleString class by inheriting all parameters of Parser and overwriting endchar, offset,
             and defstr. The subcontent_classes list is overwritten to only contain the relevant subcontent
 
         :param text:    {str}       the code which is to be analysed for documentation
@@ -516,12 +508,10 @@ class _SingleString(_Parser):
         :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
                                     for multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
         """
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"[^\\]'")
         self.offset = 2
@@ -530,12 +520,13 @@ class _SingleString(_Parser):
 
         self.defstr = "single string"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include strings in the report
+            overwrites parent report method to not include strings in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -560,8 +551,7 @@ class _DoubleString(_SingleString):
     current = re.compile(r'"')
     after = re.compile(r'[^"]|([^"]{2})')
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
+    def __init__(self, text, path, regex, parent=None, indent=0):
         """
             initializes the _DoubleString class by inheriting all parameters of _SingleString and overwriting endchar
             and defstr.
@@ -571,12 +561,10 @@ class _DoubleString(_SingleString):
         :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
                                     for multiline comment formatting. Currently implemented are functions, methods and
                                     classes.
-        :param parent:  {_Parser}   pointer to a _Parser or subclass of _Parser which contains the new instance
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
         :param indent:  {int}       number of spaces between start of line and first significant char
         """
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]"')
 
@@ -584,14 +572,32 @@ class _DoubleString(_SingleString):
 
 
 class _FormattingSingleString(_SingleString):
+    """
+        subclass of parser to detect and handle formatting single quote string structures in python code
+
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    """
 
     before = re.compile(r"f")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _FormattingSingleString class by inheriting all parameters of _SingleString, overwriting
+            endchar and defstr. and adding _CurvedBracket to the subcontent_classes list
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.subcontent_classes.append(_CurvedBracket)
 
@@ -599,14 +605,32 @@ class _FormattingSingleString(_SingleString):
 
 
 class _FormattingDoubleString(_DoubleString):
+    """
+        subclass of parser to detect and handle formatting double quote string structures in python code
+
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    """
 
     before = re.compile(r"f")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _FormattingDoubleString class by inheriting all parameters of _DoubleString, overwriting
+            endchar and defstr and adding _CurvedBracket to the subcontent_classes list
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.subcontent_classes.append(_CurvedBracket)
 
@@ -614,15 +638,47 @@ class _FormattingDoubleString(_DoubleString):
 
 
 class _SingleMultilineString(_SingleString):
+    """
+        subclass of parser to detect and handle multiline singe quote string structures in python code. This subcontent
+        is used to check docstrings for matches with the desired format as in python a multiline string at the start of
+        a class/function/method is generally accepted as the standard for docstrings.
+
+    :param before:          {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                            character
+    :param after:           {re.Pattern}    pattern to match after the current character
+    :param defstr:          {str}           string defining the type of the current code piece
+    :param basic_comments:  {bool}          code contains atleast one comment or multiline string
+    :param ml_comment:      {bool}          atleast one subcomponent is a multiline comment
+    :param endchar:         {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+    :param ml_formatted:    {bool}          one of the subcontent is a multiline comment following hte formatting
+                                            defined in regex
+    :param offset:          {int}           how many characters are to be included in text after the endchar regex
+                                            pattern is matched
+    :param parent:          {Parser, None}  parent class which contains the instance of the Parser class. For the base
+                                            class usually None due to being the primary initialized class for new files
+    :param regex:           {dict}          different regex patterns used to check docstrings for formatting and
+                                            completeness. completeness is defined as containing all relevant inputs/
+                                            parameters, returns, raises and yields
+    :param text:            {str}           all code handled by the current instance of Parser
+    """
 
     before = re.compile(r"[^\\]")
     after = re.compile(r"''")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _SingleMultilineString class by inheriting all parameters of _SingleString, overwriting
+            endchar, offset, basic_comments, ml_comments and defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r"[^\\]'''")
         self.offset = 4
@@ -633,6 +689,14 @@ class _SingleMultilineString(_SingleString):
         self.defstr = "single multiline string"
 
     def check(self):
+        """
+            checks if the multiline string is a docstring. Starts off with determining if it belongs to a class,
+            function or method and selecting the corresponding regex patterns. Terminates if not part of any of the
+            previously mentioned content. Then tries to match its text against the main regex pattern and terminates if
+            not. Upon success of matching the main pattern starts by getting a list of all parameter definitions and
+            check it against the list of found parameters. repeats this for returns, yields and raises. If all are found
+            and complete sets the documented flag for its parent to true.
+        """
         if isinstance(self.parent, _Class):
             regex = self.regex["class"]
         elif isinstance(self.parent, _Function):
@@ -684,32 +748,80 @@ class _SingleMultilineString(_SingleString):
 
 
 class _DoubleMultilineString(_SingleMultilineString):
+    """
+        subclass of parser to detect and handle multiline double quote string structures in python code. This subcontent
+        is used to check docstrings for matches with the desired format as in python a multiline string at the start of
+        a class/function/method is generally accepted as the standard for docstrings.
+
+    :param after:   {re.Pattern}    pattern to match after the current character
+    :param defstr:  {str}           string defining the type of the current code piece
+    :param endchar: {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+    :param current: {re.Pattern}    pattern indicating the start character of this code structure
+    """
 
     current = re.compile(r'"')
     after = re.compile(r'""')
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _DoubleMultilineString class by inheriting all parameters of _SingleMultilineString and
+            overwriting endchar and defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]"""')
 
         self.defstr = "double multiline string"
 
 
-class _Comment(_Parser):
+class _Comment(Parser):
+    """
+        subclass of parser to detect and handle comments in python code
+
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    :param basic_comments:      {bool}          code contains atleast one comment or multiline string
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param parent:              {Parser, None}  parent class which contains the instance of the Parser class. For the
+                                                base class usually None due to being the primary initialized class for
+                                                new files
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    """
 
     before = re.compile(r"[\w\W]")
     current = re.compile(r"#")
     after = re.compile(r"[\w\W]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Comment class by inheriting all parameters of Parser, overwriting endchar, offset,
+             basic_comments and defstr and emptying the subcontent_classes
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\\]\n')
         self.offset = 2
@@ -719,12 +831,13 @@ class _Comment(_Parser):
 
         self.defstr = "comment"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include comments in the report
+            overwrites parent report method to not include comments in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -734,17 +847,48 @@ class _Comment(_Parser):
         return df
 
 
-class _Function(_Parser):
+class _Function(Parser):
+    """
+        subclass of parser to detect and handle Functions in python code
+
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param filter:              {list}          items to exclude from listing of function parameters
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param indent:              {int}           number of spaces ahead of the definition of a function, method or class
+    :param inputs:              {list}          all input parameters of a function or method
+    :param name:                {str}           name of the current code piece
+    :param raises:              {list}          all errors found in the current code piece
+    :param returns:             {int}           count of all returns found in current code piece
+    :param text:                {str}           all code handled by the current instance of Parser
+    :param yields:              {int}           count of all yield found in the current code piece
+    """
 
     before = re.compile(r"[\n ]")
     current = re.compile(r"d")
     after = re.compile(r"ef ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Function class by inheriting all parameters of Parser, overwriting endchar, offset and
+             defstr and adding the filter parameter
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
         self.offset = 0
@@ -754,9 +898,22 @@ class _Function(_Parser):
 
     @property
     def name(self):
+        """
+            name of the Function
+
+        :return:    {str}   returns name of the function
+        """
         return self.text.split("\n")[0].split("(")[0][4:]
 
     def parameter_check(self):
+        """
+            collects all parameters of its subcontent in a list and counts the number of returns, yields and raises.
+            Furthermore it checks for the first instance of _Bracket which is assumed to be the parameter list of the
+            function. Then iterates trough all "," separated items in the pure text and removes all items containing *
+            as they are used for *args and **kwargs which are not considered for input to be documented.
+
+        :return: {list} all parameters found in subcontent
+        """
         ret = []
         for s in self.subcontent:
             ret += s.parameter_check()
@@ -788,12 +945,30 @@ class _Function(_Parser):
 
 
 class _Method(_Function):
+    """
+        subclass of _Function to detect and handle method structures in python code
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    :param defstr:      {str}   string defining the type of the current code piece
+    :param filter:      {list}  items to exclude from listing of function parameters
+    :param offset:      {int}   how many characters are to be included in text after the endchar regex pattern is
+                                matched
+    :param ret_offset:  {int}   offset on how many characters after endchar match to restart parsing in parent
+    """
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Method class by inheriting all parameters of _Function, overwriting defstr and adding self
+            to the filter
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.filter.append("self")
 
@@ -801,16 +976,39 @@ class _Method(_Function):
 
     @property
     def ret_offset(self):
+        """
+            end offset for class methods is one less than the offset
+
+        :return:    {int}   number of characters to skip
+        """
         return self.offset - 1
 
 
 class _ClassMethod(_Function):
+    """
+        subclass of _Function to detect and handle class method structures in python code
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    :param defstr:      {str}   string defining the type of the current code piece
+    :param filter:      {list}  items to exclude from listing of function parameters
+    :param offset:      {int}   how many characters are to be included in text after the endchar regex pattern is
+                                matched
+    :param ret_offset:  {int}   offset on how many characters after endchar match to restart parsing in parent
+    """
+
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _ClassMethod class by inheriting all parameters of _Function, overwriting defstr and adding
+            cls to the filter
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.filter.append("cls")
 
@@ -818,20 +1016,56 @@ class _ClassMethod(_Function):
 
     @property
     def ret_offset(self):
+        """
+            end offset for class methods is one less than the offset
+
+        :return:    {int}   number of characters to skip
+        """
         return self.offset - 1
 
 
-class _Class(_Parser):
+class _Class(Parser):
+    """
+        subclass of Parser to detect and handle class structures in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param indent:              {int}           number of spaces ahead of the definition of a function, method or class
+    :param name:                {str}           name of the current code piece
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param parameters:          {list}          all parameters found in the current code piece
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    :param text:                {str}           all code handled by the current instance of Parser
+    """
 
     before = re.compile(r"\s")
     current = re.compile(r"c")
     after = re.compile(r"lass ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Class class by inheriting all parameters of Parse, overwriting endchar, offset and defstr
+            and replacing _Function in subcontent_classes with _Method and _ClassMethod
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^\n# ]')
         self.offset = 0
@@ -844,9 +1078,19 @@ class _Class(_Parser):
 
     @property
     def name(self):
+        """
+            name of the class
+
+        :return:    {str}   name of the class
+        """
         return self.text.split("\n")[0].split(":")[0].split("(")[0][6:]
 
     def parameter_check(self):
+        """
+            collects all parameters of its subcontent in self.parameters and removes both duplicates and _Methods.
+
+        :return: {list} empty list
+        """
         for s in self.subcontent:
             self.parameters += s.parameter_check()
         self.parameters = list(set(self.parameters))
@@ -857,17 +1101,45 @@ class _Class(_Parser):
         return []
 
 
-class _Parameter(_Parser):
+class _Parameter(Parser):
+    """
+        subclass of Parser to detect and handle parameters in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param name:                {str}           name of the current code piece
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    :param text:                {str}           all code handled by the current instance of Parser
+    """
 
     before = re.compile(r"\W")
     current = re.compile(r"s")
     after = re.compile(r"elf\.")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Parameter class by inheriting all parameters of Parser, overwriting endchar, offset and
+            defstr and clearing the subcontent_classes list
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[^\.\w]')
         self.offset = 0
@@ -876,12 +1148,13 @@ class _Parameter(_Parser):
 
         self.defstr = "parameter"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include parameters in the report
+            overwrites parent report method to not include parameters in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -892,35 +1165,70 @@ class _Parameter(_Parser):
 
     @property
     def name(self):
+        """
+            name of parameter
+
+        :return:    {str}   name of the parameter
+        """
         return self.text.split(".")[1]
 
     def parameter_check(self):
+        """
+            returns its own name
+
+        :return: {list} list containing the instances name
+        """
         return [self.name]
 
 
-class _Return(_Parser):
+class _Return(Parser):
+    """
+        subclass of Parser to detect and handle returns in python code
+
+    :param after:       {re.Pattern}    pattern to match after the current character
+    :param before:      {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                        character
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param endchar:     {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given back to
+                                        the parent class
+    :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
+                                        is matched
+    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                        Parser
+    """
 
     before = re.compile(r"\W")
     current = re.compile(r"r")
     after = re.compile(r"eturn ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Return class by inheriting all parameters of Parser and overwriting endchar, offset and
+            defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'[\n#]')
         self.offset = 0
 
         self.defstr = "return"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include returns in the report
+            overwrites parent report method to not include returns in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -931,33 +1239,83 @@ class _Return(_Parser):
 
 
 class _Raise(_Return):
+    """
+        subclass of Parser to detect and handle raises in python code
+
+    :param after:       {re.Pattern}    pattern to match after the current character
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param name:        {str}           name of the current code piece
+    :param pure_text:   {str}           text that is only part of the current code piece and not contained in
+                                        any subcontent
+    """
 
     after = re.compile(r"aise ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Raise class by inheriting all parameters of _Return and overwriting defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.defstr = "raise"
 
     @property
     def name(self):
+        """
+            name of raise
+
+        :return:    {str}   name of the error raised
+        """
         return self.pure_text[6:]
 
 
-class _Property(_Parser):
+class _Property(Parser):
+    """
+        subclass of Parser to detect and handle property structures in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param indent:              {int}           number of spaces ahead of the definition of a function, method or class
+    :param name:                {str}           name of the current code piece
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    """
 
     before = re.compile(r"\W")
     current = re.compile(r"@")
     after = re.compile(r"property")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Property class by inheriting all parameters of Parser, overwriting endchar, offset and
+            defstr and replacing _Function in subcontent_classes with _Method
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
         self.offset = 0
@@ -967,12 +1325,13 @@ class _Property(_Parser):
 
         self.defstr = "property"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include Properties in the report
+            overwrites parent report method to not include Properties in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -983,28 +1342,65 @@ class _Property(_Parser):
 
     @property
     def name(self):
+        """
+            name of the property
+
+        :return:    {str}   inherits the name of its method
+        """
         for s in self.subcontent:
             if isinstance(s, _Method):
                 return s.name
 
     def parameter_check(self):
+        """
+            collects all parameters of its subcontent and its own name in a list.
+
+        :return: {list} all parameters found in subcontent and the instances name
+        """
         ret = [self.name]
         for s in self.subcontent:
             ret += s.parameter_check()
         return ret
 
 
-class _ClassMethodArgument(_Parser):
+class _ClassMethodArgument(Parser):
+    """
+        subclass of Parser to detect and handle class method argument structures in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param indent:              {int}           number of spaces ahead of the definition of a function, method or class
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    """
 
     before = re.compile(r"\W")
     current = re.compile(r"@")
     after = re.compile(r"classmethod")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _ClassMethodArgument class by inheriting all parameters of Parser, overwriting endchar,
+            offset and defstr and replacing _Function in subcontent_classes with _ClassMethod
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(f'\\n[ ]{"{0," + str(self.indent) + "}"}[^# d]')
         self.offset = 0
@@ -1014,12 +1410,13 @@ class _ClassMethodArgument(_Parser):
 
         self.defstr = "classmethodargument"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include class method arguments in the report
+            overwrites parent report method to not include class method arguments in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -1029,17 +1426,45 @@ class _ClassMethodArgument(_Parser):
         return df
 
 
-class _ClassParameter(_Parser):
+class _ClassParameter(Parser):
+    """
+        subclass of Parser to detect and handle class parameters in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param before:              {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                                character
+    :param current:             {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:              {str}           string defining the type of the current code piece
+    :param endchar:             {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given
+                                                back to the parent class
+    :param name:                {str}           name of the current code piece
+    :param offset:              {int}           how many characters are to be included in text after the endchar regex
+                                                pattern is matched
+    :param subcontent:          {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                                Parser
+    :param subcontent_classes:  {list}          all possible different subcontent types each with slightly different
+                                                purposes all of them subclasses of Parser on some level
+    :param text:                {str}           all code handled by the current instance of Parser
+    """
 
     before = re.compile(r"\W")
     current = re.compile(r"\w")
     after = re.compile(r"[\w]*[ ]+=")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Parameter class by inheriting all parameters of Parser, overwriting endchar, offset and
+            defstr and clearing the subcontent_classes list
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(r'\W')
         self.offset = 0
@@ -1048,12 +1473,13 @@ class _ClassParameter(_Parser):
 
         self.defstr = "class parameter"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include Class Parameters in the report
+            overwrites parent report method to not include Class Parameters in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -1064,35 +1490,72 @@ class _ClassParameter(_Parser):
 
     @property
     def name(self):
+        """
+            name of the class parameter
+
+        :return:    {str}   name of the class parameter
+        """
         return self.text
 
     def parameter_check(self):
+        """
+            returns its own name
+
+        :return: {list} list containing the instances name
+        """
         return [self.name]
 
 
-class _Argument(_Parser):
+class _Argument(Parser):
+    """
+        subclass of Parser to detect and handle argument structures in python code
+
+    :param after:       {re.Pattern}    pattern to match after the current character
+    :param before:      {re.Pattern}    pattern indicating the allowed characters that can be before the current
+                                        character
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:      {str}           string defining the type of the current code piece
+    :param endchar:     {re.Pattern}    a regex pattern that if matched causes the parsing authority to be given back to
+                                        the parent class
+    :param name:        {str}           name of the current code piece
+    :param offset:      {int}           how many characters are to be included in text after the endchar regex pattern
+                                        is matched
+    :param subcontent:  {list}          all sub pieces of code each a different instance of a (sub-)class of
+                                        Parser
+    :param text:        {str}           all code handled by the current instance of Parser
+    """
 
     before = re.compile(r"[\W\w]")
     current = re.compile(r"\n")
     after = re.compile(r"[ ]*@[^\Wpc]")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Argument class by inheriting all parameters of Parser and overwriting endchar, offset and
+            defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.endchar = re.compile(f'\n')
         self.offset = 0
 
         self.defstr = "argument"
 
-    def report(self, df, columns):
+    def report(self, df, columns, all=False):
         """
-            overwrites parent report methode to not include arguments in the report
+            overwrites parent report method to not include arguments in the report
 
         :param df:      {pandas.DataFrame}  dataframe used to report the lintworm findings
         :param columns: {list}              contains all columns requested to be added to the lintworm report
+        :param all:     {bool}              add all sub items to the report or reduce to highest non-documented level
 
         :return:        {pandas.DataFrame}  dataframe containing all requested info of this instance and all subcontent
         """
@@ -1103,18 +1566,38 @@ class _Argument(_Parser):
 
     @property
     def name(self):
+        """
+            name of the argument to a function
+
+        :return:    {str}   name of the argument with out the @
+        """
         return self.text[1:]
 
 
 class _Yield(_Return):
+    """
+        subclass of Parser to detect and handle yields in python code
+
+    :param after:               {re.Pattern}    pattern to match after the current character
+    :param current:     {re.Pattern}    pattern indicating the start character of this code structure
+    :param defstr:      {str}           string defining the type of the current code piece
+    """
 
     current = re.compile(r"y")
     after = re.compile(r"ield ")
 
-    def __init__(self, text, path, regex, parent=None, indent=0, func_param=True, func_raise=True, func_return=True,
-                 method_param=True, method_raise=True, method_return=True, class_attribute=True):
-        super().__init__(text, path, regex, parent, indent, func_param=func_param, func_raise=func_raise,
-                         func_return=func_return, method_param=method_param, method_raise=method_raise,
-                         method_return=method_return, class_attribute=class_attribute)
+    def __init__(self, text, path, regex, parent=None, indent=0):
+        """
+            initializes the _Yield class by inheriting all parameters of _Return and overwriting defstr
+
+        :param text:    {str}       the code which is to be analysed for documentation
+        :param path:    {Pathlike}  abspath to file from which the text is taken
+        :param regex:   {dict}      dictionary containing dictionaries for each code peace which should be checked
+                                    for multiline comment formatting. Currently implemented are functions, methods and
+                                    classes.
+        :param parent:  {Parser}    pointer to a Parser or subclass of Parser which contains the new instance
+        :param indent:  {int}       number of spaces between start of line and first significant char
+        """
+        super().__init__(text, path, regex, parent, indent)
 
         self.defstr = "yield"

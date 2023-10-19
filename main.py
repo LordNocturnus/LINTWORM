@@ -9,8 +9,7 @@ import util
 
 def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.standard_classregex,
              functionregex=util.standard_functionregex, methodregex=util.standard_methodregex,
-             columns=util.standard_columns, hash_path=None, level="documented", file_filter=None,
-             class_attribute=False):
+             columns=util.standard_columns, hash_path=None, level="documented", file_filter=None, all=False):
     """
         main function of lintwork. It checks all python files in the given folder for a certain level of documentation
 
@@ -68,7 +67,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
                                                                        docstrings
     :param file_filter:     {Pathlike,list} list containing strings following the glob format path to a file
                                             following the .gitignore format
-    :param class_attribute: {bool}          if true include class attributes in the docstring of classes
+    :param all:             {bool}          add all sub items to the report or reduce to highest non-documented level
 
     :return:                {DataFrame}     pandas dataframe identical to the generated lintworm report
     """
@@ -82,7 +81,9 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
     if not report_name:
         report_name = "LintwormReport_" + datetime.now().strftime("%H_%M_%S") + ".csv"
 
-    report_path = str(os.path.join(os.path.abspath(report_path), os.path.normpath(report_name)))
+    report_path = os.path.join(os.path.abspath(report_path), os.path.normpath(report_name))
+    if os.path.exists(report_path):
+        os.remove(report_path)
     if "basic comments" not in columns:  # basic comments column is always in the report
         columns.append("basic comments")
     if "multiline comments" not in columns:  # multiline comments column is always in the report
@@ -122,6 +123,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
         if not p.name[-3:] == ".py":
             continue
         hashed = False
+        print(p)
         try:
             valid = True
             text = open(p, "r").read()
@@ -131,7 +133,7 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             valid = False
 
         if valid and hashed:
-            code = parser._Parser("", p, regex, class_attribute=class_attribute)
+            code = parser.Parser("", p, regex)
             code.basic_comments = hash_df["basic comments"][hash_df["path"] == str(p)].iloc[0]
             code.ml_comment = hash_df["multiline comments"][hash_df["path"] == str(p)].iloc[0]
             code.ml_formatted = hash_df["formatted multiline"][hash_df["path"] == str(p)].iloc[0]
@@ -140,15 +142,15 @@ def lintworm(path, report_path=os.getcwd(), report_name=None, classregex=util.st
             if "\t" in text:
                 text = util.replace_tabs(text)
 
-            code = parser._Parser(text, p, regex)
+            code = parser.Parser(text, p, regex)
 
             code.parse()
             code.parameter_check()
             code.check()
         else:
-            code = parser._Parser("", p, regex)
+            code = parser.Parser("", p, regex)
 
-        df = code.report(pd.DataFrame([], columns=columns), columns)
+        df = code.report(pd.DataFrame([], columns=columns), columns, all)
         if hash_path:
             if not in_df:
                 new_hash = pd.DataFrame([[p, True, code.basic_comments, code.ml_comment, code.ml_formatted,
@@ -213,8 +215,8 @@ def check_integrity(path, hash_path):
 
 
 if __name__ == "__main__":
-    test = lintworm("G:/pythonprojects/stratosiv", hash_path="G:/pythonprojects/NEST/LINTWORM/hash.csv",
-                    file_filter=["*\\.git", "*\\.idea",
-                                 "G:\\pythonprojects\\stratosiv\\Libraries\\rocket-simulations\\examples\\Stratos_II_MC\\get-pip.py",
-                                 "G:\\pythonprojects\\stratosiv\\Libraries\\rocket-simulations\\src\\DTST\\Tools\\dmca\\analysis\\parser.py"], columns=["path", "name", "type"])
+    cwd = os.getcwd()
+    test = lintworm(cwd, hash_path=cwd + "/hash.csv", file_filter=["*\\.git", "*\\.idea"],
+                    columns=["name", "type", "missing inputs", "returns", "found returns", "yields", "found yields",
+                             "missing raises", "missing parameters"], report_name="LintwormReport.csv", all=True)
     print("FINISHED")
