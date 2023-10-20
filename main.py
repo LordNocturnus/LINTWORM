@@ -216,7 +216,14 @@ def check_integrity(path, hash_path):
 
 if __name__ == "__main__":
     cwd = os.getcwd()
-    test = lintworm(cwd, hash_path=cwd + "/hash.csv", file_filter=["*\\.git", "*\\.idea"],
-                    columns=["name", "type", "missing inputs", "returns", "found returns", "yields", "found yields",
-                             "missing raises", "missing parameters"], report_name="LintwormReport.csv", all=True)
+    test = lintworm(cwd, hash_path=cwd + "/hash.csv", file_filter=["*\\.git", "*\\.idea", "*\\venv"],
+                    report_name="LintwormReport.csv", all=True, columns=["path", "name", "type", "start char",
+                                                                         "end char", "inputs", "found inputs",
+                                                                         "missing inputs", "returns", "found returns",
+                                                                         "yields", "found yields", "raises",
+                                                                         "found raises", "missing raises",
+                                                                         "parameters", "found parameters",
+                                                                         "missing parameters", "basic comments",
+                                                                         "multiline comments", "formatted multiline",
+                                                                         "documented"])
     print("FINISHED")

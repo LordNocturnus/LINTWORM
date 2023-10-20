@@ -265,10 +265,16 @@ class Parser(object):
             col.append("type")
 
         if "start char" in columns:
-            data.append(self.start + 1)
+            try:
+                data.append(self.start + 1)
+            except TypeError:
+                data.append(1)
             col.append("start char")
         if "end char" in columns:
-            data.append(self.end + 1)
+            try:
+                data.append(self.end + 1)
+            except TypeError:
+                data.append(len(self.text))
             col.append("end char")
 
         if "inputs" in columns:
