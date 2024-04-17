@@ -1,6 +1,0 @@
-matplotlib
-pandas
-PySide2
-PySimpleGUI
-PySimpleGUIQt
-numpy
