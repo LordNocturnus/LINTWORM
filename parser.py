@@ -925,10 +925,10 @@ class _Function(Parser):
             ret += s.parameter_check()
             if isinstance(s, _Raise):
                 self.raises.append(s.name)
-            elif isinstance(s, _Return):
-                self.returns += 1
             elif isinstance(s, _Yield):
                 self.yields += 1
+            elif isinstance(s, _Return):
+                self.returns += 1
 
         for s in self.subcontent:
             if isinstance(s, _Bracket):
