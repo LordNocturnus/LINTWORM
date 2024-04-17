@@ -1100,11 +1100,10 @@ class _Class(Parser):
         for s in self.subcontent:
             self.parameters += s.parameter_check()
         self.parameters = list(set(self.parameters))
-        for p in self.parameters:
-            for s in self.subcontent:
-                if p == s.name and isinstance(s, _Method):
-                    self.parameters.pop(self.parameters.index(p))
-                    break
+
+        for s in self.subcontent:
+            if isinstance(s, _Method) and s.name in self.parameters:
+                self.parameters.remove(s.name)
         return []
 
 
