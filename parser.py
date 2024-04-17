@@ -145,7 +145,7 @@ class Parser(object):
         """
         text = self.text
         for s in self.subcontent:
-            text = text.replace(s.text, "")
+            text = text.replace(s.text, "", 1)
         return text
 
     def parse(self, start=0):
