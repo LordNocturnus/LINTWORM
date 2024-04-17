@@ -336,7 +336,7 @@ class Parser(object):
         datapoint = pd.DataFrame([data], columns=col)
         df = pd.concat([df, datapoint], ignore_index=True)
 
-        if all and not self.documented:
+        if all or not self.documented:
             for sub in self.subcontent:
                 df = sub.report(df, columns, all)
 
